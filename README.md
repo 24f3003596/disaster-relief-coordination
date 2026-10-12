@@ -22,30 +22,35 @@ The project strictly follows the **Application Factory** and **Flask Blueprint**
 
 ```text
 disaster-relief-coordination/
-├── app.py                      # Application factory (create_app), blueprint registration, error handlers
-├── constants.py                # System-wide enums, constants, validation boundaries, and role definitions
-├── models.py                   # SQLAlchemy ORM models (User, Incident, ReliefRequest, InventoryItem,
-│                               #                       Assignment, Notification, AuditLog)
-├── extensions.py               # Shared SQLAlchemy instance (db)
+├── app.py                      # Application factory (create_app), session management, error handlers, demo seeder
 ├── requirements.txt            # Project dependencies (Flask, SQLAlchemy, pytest, pytest-cov, radon)
+├── README.md                   # Complete Review 2 documentation & user guide
 │
-├── auth.py                     # Authentication blueprint & helpers (register, login, logout, roles)
-├── incidents.py                # Incident reporting and affected areas blueprint
-├── inventory.py                # Warehouse inventory tracking and low-stock alerts blueprint
-├── requests_module.py          # Victim relief request intake and status tracking blueprint
-├── assignments.py              # Atomic resource allocation and volunteer dispatch blueprint
-├── notifications.py            # User notification inbox and coordinator emergency broadcast blueprint
-├── volunteers.py               # Volunteer task assignments and directory blueprint
-├── reports.py                  # Operational summary and relief status reporting blueprint
-├── dashboard.py                # Coordinator metrics and analytics dashboard blueprint
-├── audit.py                    # Action logging and security audit trail blueprint
+├── core/                       # Core database models, system constants & extensions
+│   ├── __init__.py             # Exposes db, models, constants
+│   ├── models.py               # 7 SQLAlchemy ORM models (User, Incident, ReliefRequest, InventoryItem, Assignment, Notification, AuditLog)
+│   ├── constants.py            # Global enums, validation boundaries, and role definitions
+│   └── extensions.py           # Shared SQLAlchemy database instance (db)
+│
+├── routes/                     # Modular feature blueprints
+│   ├── __init__.py             # Exposes all blueprint instances
+│   ├── auth.py                 # Authentication blueprint & helpers (register, login, logout, roles)
+│   ├── incidents.py            # Incident reporting and affected areas blueprint
+│   ├── inventory.py            # Warehouse inventory tracking and low-stock alerts blueprint
+│   ├── requests_module.py      # Victim relief request intake and status tracking blueprint
+│   ├── assignments.py          # Atomic resource allocation and volunteer dispatch blueprint
+│   ├── notifications.py        # User notification inbox and coordinator emergency broadcast blueprint
+│   ├── volunteers.py           # Volunteer task assignments and directory blueprint
+│   ├── reports.py              # Operational summary and relief status reporting blueprint
+│   ├── dashboard.py            # Coordinator metrics and analytics dashboard blueprint
+│   └── audit.py                # Action logging and security audit trail blueprint
 │
 ├── static/
 │   └── style.css               # Clean styling and UI accents
 │
-├── templates/
-│   ├── base.html               # Master layout with responsive navigation & role indicators
-│   ├── login.html              # User login page
+├── templates/                  # 12 Responsive Bootstrap Jinja2 templates (role-adaptive navigation)
+│   ├── base.html               # Master layout with dynamic role indicators, navbar, & alerts
+│   ├── login.html              # Login page with 1-click Quick Demo logins
 │   ├── register.html           # User registration page
 │   ├── dashboard.html          # Coordinator analytical overview
 │   ├── incidents.html          # Incident management interface
@@ -150,3 +155,29 @@ All team feature branches were developed on dedicated branch tracks and merged i
 4. `naresh-feature` by **Sree Naresh A**
 
 All authors are credited in the Git commit tree and appear on GitHub's Contributors graph.
+
+---
+
+## 🔐 Role-Based Access Control (RBAC) Matrix
+
+| Feature / URL | Unauthenticated | Victim | Volunteer | Coordinator / Admin |
+|---|---|---|---|---|
+| **Public Incidents** (`/incidents`) | ✅ View list | ✅ View list | ✅ View list | ✅ Full management |
+| **Relief Request Intake** (`/requests`) | 🔄 Redirect /login | ✅ Submit & view own | ✅ View list | ✅ Full management & status |
+| **Volunteer Assignments** (`/assignments`) | 🔄 Redirect /login | ❌ Forbidden | ✅ View my tasks & update status | ✅ Full allocation console |
+| **Warehouse Inventory** (`/inventory`) | 🔄 Redirect /login | ❌ Forbidden | ❌ Forbidden | ✅ Full stock tracking & intake |
+| **Coordinator Dashboard** (`/dashboard/`) | 🔄 Redirect /login | ❌ Forbidden | ❌ Forbidden | ✅ Full analytics & KPIs |
+| **Emergency Alerts** (`/alerts`) | 🔄 Redirect /login | ❌ Forbidden | ❌ Forbidden | ✅ Broadcast alerts |
+| **Operational Reports** (`/reports`) | 🔄 Redirect /login | ❌ Forbidden | ❌ Forbidden | ✅ Filtered metrics |
+| **Notifications Inbox** (`/notifications`) | 🔄 Redirect /login | ✅ Own alerts | ✅ Own dispatch alerts | ✅ All system notices |
+
+---
+
+## 📋 JIRA Review 2 Agile Execution Guide
+
+### Sprint Breakdown
+- **Sprint 1 (Foundations & Authentication)**: Models schema, Password hashing, Registration, Incidents intake, Inventory core (`TEAM20-16`, `TEAM20-17`, `TEAM20-18`, `TEAM20-19`).
+- **Sprint 2 (Operations, Coordination & Delivery)**: Relief requests intake, Volunteer assignment & atomic stock deduction, Notifications & emergency broadcast, Analytics dashboard, Audit logging (`TEAM20-20` through `TEAM20-28`).
+
+### Status for Review 2
+All sprint user stories and subtasks are marked **Done** in accordance with the 100% passing test suite and demonstrable live increment.

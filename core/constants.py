@@ -1,0 +1,122 @@
+"""Shared constants for Disaster Relief Resource Coordination System."""
+
+# User Roles
+ROLE_VICTIM = "Victim"
+ROLE_VOLUNTEER = "Volunteer"
+ROLE_COORDINATOR = "Coordinator"
+ROLE_ADMIN = "Admin"
+ROLES = ("Victim", "Volunteer", "Coordinator", "Admin")
+VALID_ROLES = [ROLE_VICTIM, ROLE_VOLUNTEER, ROLE_COORDINATOR, ROLE_ADMIN]
+
+# Relief Request & Incident Urgency / Severity Levels
+URGENCY_LOW = "Low"
+URGENCY_MEDIUM = "Medium"
+URGENCY_HIGH = "High"
+URGENCY_CRITICAL = "Critical"
+URGENCY_LEVELS = ("Critical", "High", "Medium", "Low")
+VALID_URGENCIES = [URGENCY_LOW, URGENCY_MEDIUM, URGENCY_HIGH, URGENCY_CRITICAL]
+
+SEVERITY_LOW = "Low"
+SEVERITY_MEDIUM = "Medium"
+SEVERITY_HIGH = "High"
+SEVERITY_CRITICAL = "Critical"
+INCIDENT_SEVERITIES = ("Critical", "High", "Medium", "Low")
+VALID_SEVERITIES = [SEVERITY_LOW, SEVERITY_MEDIUM, SEVERITY_HIGH, SEVERITY_CRITICAL]
+
+# Relief Request Statuses
+STATUS_REQUEST_PENDING = "Pending"
+STATUS_REQUEST_ASSIGNED = "Assigned"
+STATUS_REQUEST_ALLOCATED = "Allocated"
+STATUS_REQUEST_IN_PROGRESS = "In Progress"
+STATUS_REQUEST_FULFILLED = "Fulfilled"
+STATUS_REQUEST_COMPLETED = "Completed"
+STATUS_REQUEST_CANCELLED = "Cancelled"
+REQUEST_STATUSES = (
+    "Pending",
+    "Assigned",
+    "Allocated",
+    "In Progress",
+    "Fulfilled",
+    "Completed",
+    "Cancelled",
+)
+VALID_REQUEST_STATUSES = list(REQUEST_STATUSES)
+
+# Assignment Statuses
+STATUS_ASSIGNMENT_ASSIGNED = "Assigned"
+STATUS_ASSIGNMENT_ACCEPTED = "Accepted"
+STATUS_ASSIGNMENT_IN_PROGRESS = "In Progress"
+STATUS_ASSIGNMENT_COMPLETED = "Completed"
+STATUS_ASSIGNMENT_UNABLE = "Unable to Complete"
+STATUS_ASSIGNMENT_CANCELLED = "Cancelled"
+ASSIGNMENT_STATUSES = (
+    "Assigned",
+    "Accepted",
+    "In Progress",
+    "Completed",
+    "Unable to Complete",
+    "Cancelled",
+)
+VALID_ASSIGNMENT_STATUSES = list(ASSIGNMENT_STATUSES)
+
+# Incident Statuses
+STATUS_INCIDENT_OPEN = "Open"
+STATUS_INCIDENT_IN_PROGRESS = "In Progress"
+STATUS_INCIDENT_MONITORING = "Monitoring"
+STATUS_INCIDENT_RESOLVED = "Resolved"
+STATUS_INCIDENT_CLOSED = "Closed"
+INCIDENT_STATUSES = ("Open", "In Progress", "Monitoring", "Resolved", "Closed")
+VALID_INCIDENT_STATUSES = list(INCIDENT_STATUSES)
+
+# Resource Categories
+CATEGORY_FOOD = "Food"
+CATEGORY_WATER = "Water"
+CATEGORY_FOOD_WATER = "Food & Water"
+CATEGORY_MEDICAL = "Medical Supplies"
+CATEGORY_MEDICAL_AID = "Medical Aid"
+CATEGORY_SHELTER = "Blankets & Shelter"
+CATEGORY_SHELTER_GEN = "Shelter"
+CATEGORY_CLOTHING = "Clothing"
+CATEGORY_HYGIENE = "Sanitation & Hygiene"
+CATEGORY_RESCUE = "Search & Rescue Equipment"
+CATEGORY_RESCUE_GEN = "Rescue"
+REQUEST_CATEGORIES = (
+    "Food",
+    "Water",
+    "Food & Water",
+    "Medical Supplies",
+    "Medical Aid",
+    "Blankets & Shelter",
+    "Shelter",
+    "Clothing",
+    "Sanitation & Hygiene",
+    "Search & Rescue Equipment",
+    "Rescue",
+)
+VALID_CATEGORIES = list(REQUEST_CATEGORIES)
+
+# Notification Types
+NOTIFICATION_GENERAL = "General"
+NOTIFICATION_ASSIGNMENT = "Assignment"
+NOTIFICATION_EMERGENCY = "Emergency"
+NOTIFICATION_STATUS_UPDATE = "StatusUpdate"
+NOTIFICATION_CRITICAL_SHORTAGE = "Critical Shortage"
+VALID_NOTIFICATION_TYPES = [
+    NOTIFICATION_GENERAL,
+    NOTIFICATION_ASSIGNMENT,
+    NOTIFICATION_EMERGENCY,
+    NOTIFICATION_STATUS_UPDATE,
+    NOTIFICATION_CRITICAL_SHORTAGE,
+]
+
+# Audit Log Actions
+ACTION_CREATE_USER = "CREATE_USER"
+ACTION_UPDATE_ROLE = "UPDATE_ROLE"
+ACTION_CREATE_INCIDENT = "CREATE_INCIDENT"
+ACTION_CREATE_REQUEST = "CREATE_REQUEST"
+ACTION_UPDATE_REQUEST_STATUS = "UPDATE_REQUEST_STATUS"
+ACTION_CREATE_INVENTORY = "CREATE_INVENTORY"
+ACTION_UPDATE_INVENTORY = "UPDATE_INVENTORY"
+ACTION_ALLOCATE_RESOURCE = "ALLOCATE_RESOURCE"
+ACTION_COMPLETE_ASSIGNMENT = "COMPLETE_ASSIGNMENT"
+ACTION_EMERGENCY_ALERT = "EMERGENCY_ALERT"

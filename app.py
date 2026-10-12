@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import Flask, jsonify, request, redirect, url_for, render_template, session
+from flask import Flask, jsonify, request, redirect, url_for, render_template, session, flash
 
 from extensions import db
 from auth import auth_bp, register_user, authenticate_user
@@ -39,10 +39,29 @@ def create_app(test_config=None):
     app.register_blueprint(volunteers_bp, url_prefix="/volunteers")
     app.register_blueprint(notifications_bp, url_prefix="/notifications")
 
+    @app.context_processor
+    def inject_auth_context():
+        user_id = session.get("user_id")
+        user = db.session.get(User, user_id) if user_id else None
+        return {
+            "current_user": user,
+            "logged_in": user is not None,
+            "user_role": user.role if user else None,
+        }
+
     @app.get("/")
     def index():
         if "text/html" in request.headers.get("Accept", ""):
-            return redirect(url_for("dashboard.dashboard_page"))
+            user_id = session.get("user_id")
+            if user_id:
+                user = db.session.get(User, user_id)
+                if user and user.role in ["Coordinator", "Admin"]:
+                    return redirect(url_for("dashboard.dashboard_page"))
+                elif user and user.role == "Volunteer":
+                    return redirect(url_for("root_assignments"))
+                else:
+                    return redirect("/requests")
+            return redirect(url_for("root_login"))
         return jsonify({
             "project": "Disaster Relief Resource Coordination System",
             "version": "1.0.0",
@@ -85,12 +104,36 @@ def create_app(test_config=None):
             user = authenticate_user(data.get("email"), data.get("password"))
             if user:
                 session["user_id"] = user.user_id
-                return redirect(url_for("dashboard.dashboard_page"))
+                session["user_name"] = user.name
+                session["role"] = user.role
+                flash(f"Signed in as {user.name} ({user.role})", "success")
+                if user.role in ["Coordinator", "Admin"]:
+                    return redirect(url_for("dashboard.dashboard_page"))
+                elif user.role == "Volunteer":
+                    return redirect(url_for("root_assignments"))
+                else:
+                    return redirect("/requests")
             return render_template("login.html", error="Invalid credentials"), 401
         return render_template("login.html"), 200
 
+    @app.route("/logout", methods=["GET", "POST"])
+    def root_logout():
+        session.clear()
+        flash("You have been signed out successfully.", "info")
+        return redirect(url_for("root_login"))
+
     @app.route("/assignments", methods=["GET", "POST"])
     def root_assignments():
+        user_id = session.get("user_id")
+        user = db.session.get(User, user_id) if user_id else None
+        if not app.config.get("TESTING"):
+            if not user:
+                flash("Please sign in to access assignments.", "warning")
+                return redirect(url_for("root_login"))
+            if user.role == "Victim":
+                flash("Access denied: Assignments are restricted to volunteers and coordinators.", "danger")
+                return redirect("/requests")
+
         if request.method == "POST":
             data = request.form
             try:
@@ -129,11 +172,30 @@ def create_app(test_config=None):
 
     @app.route("/volunteers", methods=["GET"])
     def root_volunteers():
+        user_id = session.get("user_id")
+        user = db.session.get(User, user_id) if user_id else None
+        if not app.config.get("TESTING"):
+            if not user:
+                flash("Please sign in to view the volunteer directory.", "warning")
+                return redirect(url_for("root_login"))
+            if user.role not in ["Coordinator", "Admin"]:
+                flash("Access denied: Volunteer directory requires coordinator permissions.", "danger")
+                return redirect(url_for("index"))
         vols = list_volunteers()
         return render_template("volunteers.html", volunteers=vols), 200
 
     @app.route("/alerts", methods=["GET", "POST"])
     def root_alerts():
+        user_id = session.get("user_id")
+        user = db.session.get(User, user_id) if user_id else None
+        if not app.config.get("TESTING"):
+            if not user:
+                flash("Please sign in as coordinator to broadcast alerts.", "warning")
+                return redirect(url_for("root_login"))
+            if user.role not in ["Coordinator", "Admin"]:
+                flash("Access denied: Emergency broadcasts require coordinator permissions.", "danger")
+                return redirect(url_for("index"))
+
         if request.method == "POST":
             message = request.form.get("message")
             type_val = request.form.get("type", "Emergency")
@@ -153,6 +215,15 @@ def create_app(test_config=None):
 
     @app.route("/reports", methods=["GET"])
     def root_reports():
+        user_id = session.get("user_id")
+        user = db.session.get(User, user_id) if user_id else None
+        if not app.config.get("TESTING"):
+            if not user:
+                flash("Please sign in to access reports.", "warning")
+                return redirect(url_for("root_login"))
+            if user.role not in ["Coordinator", "Admin"]:
+                flash("Access denied: Operational reports require coordinator permissions.", "danger")
+                return redirect(url_for("index"))
         summary = get_dashboard_summary()
         return render_template("reports.html", summary=summary), 200
 

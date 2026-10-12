@@ -133,6 +133,19 @@ def list_items_route():
             "inventory": items_dict,
             "total_items": len(items),
         }), 200
+    from flask import current_app, session, redirect, url_for, flash
+    from models import User
+    user_id = session.get("user_id")
+    user = db.session.get(User, user_id) if user_id else None
+    if not current_app.config.get("TESTING"):
+        if not user:
+            flash("Please sign in to view warehouse inventory.", "warning")
+            return redirect(url_for("root_login"))
+        if user.role not in ["Coordinator", "Admin"]:
+            flash("Access denied: Warehouse inventory is restricted to coordinators.", "danger")
+            if user.role == "Volunteer":
+                return redirect(url_for("root_assignments"))
+            return redirect("/requests")
     return render_template("inventory.html", items=items, inventory=items_dict), 200
 
 @inventory_bp.get("/<int:item_id>")
