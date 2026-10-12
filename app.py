@@ -162,7 +162,52 @@ def create_app(test_config=None):
 
     return app
 
+def seed_initial_demo_data():
+    from werkzeug.security import generate_password_hash
+    from constants import (
+        ROLE_COORDINATOR, ROLE_VOLUNTEER, ROLE_VICTIM, ROLE_ADMIN,
+        STATUS_INCIDENT_OPEN, STATUS_INCIDENT_IN_PROGRESS,
+        STATUS_REQUEST_PENDING, URGENCY_HIGH, URGENCY_MEDIUM,
+        CATEGORY_WATER, CATEGORY_FOOD, CATEGORY_MEDICAL, CATEGORY_SHELTER,
+        SEVERITY_HIGH, SEVERITY_CRITICAL
+    )
+    if User.query.first() is None:
+        c = User(name="Coordinator Alice", email="coordinator@example.com", phone="+1234567890", role=ROLE_COORDINATOR, password_hash=generate_password_hash("password123"))
+        v = User(name="Volunteer Bob", email="volunteer@example.com", phone="+1234567891", role=ROLE_VOLUNTEER, password_hash=generate_password_hash("password123"))
+        vic = User(name="Victim Carol", email="victim@example.com", phone="+1234567892", role=ROLE_VICTIM, password_hash=generate_password_hash("password123"))
+        adm = User(name="Admin Dave", email="admin@example.com", phone="+1234567893", role=ROLE_ADMIN, password_hash=generate_password_hash("password123"))
+        db.session.add_all([c, v, vic, adm])
+        db.session.commit()
+    else:
+        c = User.query.filter_by(role=ROLE_COORDINATOR).first()
+        vic = User.query.filter_by(role=ROLE_VICTIM).first()
+
+    if Incident.query.first() is None and c:
+        inc1 = Incident(title="Coastal Flooding - Sector 4", description="Severe storm surge and river overflow in Sector 4", severity=SEVERITY_HIGH, status=STATUS_INCIDENT_OPEN, latitude=13.0827, longitude=80.2707, reported_by=c.user_id)
+        inc2 = Incident(title="Earthquake Tremors - District 2", description="Structural damage reported in low-lying commercial blocks", severity=SEVERITY_CRITICAL, status=STATUS_INCIDENT_IN_PROGRESS, latitude=13.0450, longitude=80.2200, reported_by=c.user_id)
+        db.session.add_all([inc1, inc2])
+        db.session.commit()
+    inc1 = Incident.query.first()
+
+    if InventoryItem.query.first() is None:
+        item1 = InventoryItem(category=CATEGORY_WATER, quantity=500, threshold=100, storage_location="Warehouse A - Bay 1")
+        item2 = InventoryItem(category=CATEGORY_MEDICAL, quantity=120, threshold=30, storage_location="Warehouse A - Medical Wing")
+        item3 = InventoryItem(category=CATEGORY_FOOD, quantity=350, threshold=80, storage_location="Warehouse B - Cold Storage")
+        item4 = InventoryItem(category=CATEGORY_SHELTER, quantity=25, threshold=50, storage_location="Warehouse B - Dry Storage")
+        db.session.add_all([item1, item2, item3, item4])
+        db.session.commit()
+
+    if ReliefRequest.query.first() is None and vic:
+        req1 = ReliefRequest(user_id=vic.user_id, category=CATEGORY_WATER, quantity=50, urgency=URGENCY_HIGH, location="Sector 4 Emergency Center", latitude=13.0827, longitude=80.2707, status=STATUS_REQUEST_PENDING, incident_id=inc1.incident_id if inc1 else None)
+        req2 = ReliefRequest(user_id=vic.user_id, category=CATEGORY_FOOD, quantity=30, urgency=URGENCY_MEDIUM, location="District 2 Relief Camp", latitude=13.0820, longitude=80.2710, status=STATUS_REQUEST_PENDING, incident_id=inc1.incident_id if inc1 else None)
+        db.session.add_all([req1, req2])
+        db.session.commit()
+
+
 app = create_app()
 
 if __name__ == "__main__":
+    with app.app_context():
+        seed_initial_demo_data()
     app.run(debug=True, port=5000)
+
