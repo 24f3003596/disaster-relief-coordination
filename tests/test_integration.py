@@ -1,0 +1,262 @@
+"""
+Integration and End-to-End Workflow Testing for SE Project Review 2.
+Implements the full critical priority workflow:
+1. Register Coordinator, Volunteer, and Victim accounts
+2. Register initial Inventory stock
+3. Victim submits a Relief Request
+4. Coordinator allocates inventory to the request with an assigned volunteer
+5. Verify atomic inventory deduction and assignment creation
+6. Verify automated notifications generated for both Volunteer and Victim
+7. Volunteer completes the assignment
+8. Verify final status updates and dashboard KPI reflection
+"""
+
+import pytest
+from extensions import db
+from models import User, InventoryItem, ReliefRequest, Assignment, Notification
+from auth import register_user
+from inventory import create_inventory_item
+from requests_module import create_relief_request
+from assignments import allocate_request, complete_assignment
+from dashboard import get_dashboard_summary
+from constants import (
+    ROLE_COORDINATOR,
+    ROLE_VOLUNTEER,
+    ROLE_VICTIM,
+    CATEGORY_FOOD_WATER,
+    URGENCY_CRITICAL,
+    STATUS_REQUEST_ALLOCATED,
+    STATUS_REQUEST_COMPLETED,
+    STATUS_ASSIGNMENT_ASSIGNED,
+    STATUS_ASSIGNMENT_COMPLETED,
+    NOTIFICATION_ASSIGNMENT,
+)
+
+def test_end_to_end_relief_workflow(app):
+    with app.app_context():
+        # Step 1: Register Users
+        coordinator = register_user(
+            name="Relief Coordinator",
+            email="coordinator@relief.org",
+            password="secure-password-123",
+            phone="9876543210",
+            role=ROLE_COORDINATOR,
+        )
+        volunteer = register_user(
+            name="Field Volunteer",
+            email="volunteer@relief.org",
+            password="secure-password-123",
+            phone="9876543211",
+            role=ROLE_VOLUNTEER,
+        )
+        victim = register_user(
+            name="Victim Citizen",
+            email="victim@citizen.org",
+            password="secure-password-123",
+            phone="9876543212",
+            role=ROLE_VICTIM,
+        )
+
+        assert coordinator.user_id is not None
+        assert volunteer.user_id is not None
+        assert victim.user_id is not None
+
+        # Step 2: Register Inventory Resource
+        initial_stock = 200
+        threshold_val = 30
+        item = create_inventory_item(
+            category=CATEGORY_FOOD_WATER,
+            quantity=initial_stock,
+            storage_location="Central Disaster Warehouse Sector 1",
+            threshold=threshold_val,
+        )
+        assert item.item_id is not None
+        assert item.quantity == 200
+
+        # Step 3: Victim Submits Relief Request
+        requested_qty = 25
+        req = create_relief_request(
+            user_id=victim.user_id,
+            category=CATEGORY_FOOD_WATER,
+            quantity=requested_qty,
+            urgency=URGENCY_CRITICAL,
+            latitude=13.0827,
+            longitude=80.2707,
+            location="Emergency Camp 4, North Sector",
+        )
+        assert req.request_id is not None
+        assert req.status == "Pending"
+
+        # Step 4: Coordinator Allocates Inventory and Assigns Volunteer
+        assignment = allocate_request(
+            request_id=req.request_id,
+            volunteer_id=volunteer.user_id,
+            item_id=item.item_id,
+        )
+
+        # Step 5: Verify Atomic Inventory Stock Deduction
+        db.session.refresh(item)
+        db.session.refresh(req)
+        assert item.quantity == (initial_stock - requested_qty)  # 200 - 25 = 175
+        assert req.status == STATUS_REQUEST_ALLOCATED
+        assert assignment.status == STATUS_ASSIGNMENT_ASSIGNED
+        assert assignment.quantity_assigned == requested_qty
+
+        # Step 6: Verify Automated Notifications Generated
+        vol_notif = Notification.query.filter_by(user_id=volunteer.user_id).first()
+        assert vol_notif is not None
+        assert vol_notif.type == NOTIFICATION_ASSIGNMENT
+        assert "Deliver 25" in vol_notif.message
+
+        victim_notif = Notification.query.filter_by(user_id=victim.user_id).first()
+        assert victim_notif is not None
+        assert "allocated" in victim_notif.message
+
+        # Step 7: Volunteer Completes Assignment Delivery
+        completed_task = complete_assignment(assignment.task_id)
+        db.session.refresh(req)
+        assert completed_task.status == STATUS_ASSIGNMENT_COMPLETED
+        assert completed_task.completed_at is not None
+        assert req.status == STATUS_REQUEST_COMPLETED
+
+        # Step 8: Verify Dashboard KPI Reflects Completed Workflow
+        dashboard = get_dashboard_summary()
+        assert dashboard["requests"]["total"] == 1
+        assert dashboard["requests"]["completed"] == 1
+        assert dashboard["requests"]["pending"] == 0
+        assert dashboard["inventory"]["total_units"] == 175
+        assert dashboard["volunteers"]["total_count"] == 1
+
+def test_allocation_insufficient_stock_fails_atomically(app):
+    with app.app_context():
+        volunteer = register_user(
+            name="Field Volunteer 2",
+            email="vol2@relief.org",
+            password="secure-password-123",
+            role=ROLE_VOLUNTEER,
+        )
+        victim = register_user(
+            name="Victim 2",
+            email="victim2@citizen.org",
+            password="secure-password-123",
+            role=ROLE_VICTIM,
+        )
+        item = create_inventory_item(
+            category=CATEGORY_FOOD_WATER,
+            quantity=10,
+            storage_location="Depot",
+            threshold=5,
+        )
+        req = create_relief_request(
+            user_id=victim.user_id,
+            category=CATEGORY_FOOD_WATER,
+            quantity=50,  # Demands 50 but stock only 10
+            urgency=URGENCY_CRITICAL,
+        )
+
+        with pytest.raises(ValueError, match="Insufficient stock"):
+            allocate_request(
+                request_id=req.request_id,
+                volunteer_id=volunteer.user_id,
+                item_id=item.item_id,
+            )
+
+        # Confirm rollback / no changes occurred
+        db.session.refresh(item)
+        db.session.refresh(req)
+        assert item.quantity == 10
+        assert req.status == "Pending"
+        assert Assignment.query.filter_by(request_id=req.request_id).first() is None
+
+def test_automated_workflow_via_http_client(client, app):
+    """
+    Automated user workflow using Flask Test Client simulating full web requests:
+    1. Register users via HTTP API
+    2. Coordinator creates inventory item via HTTP API
+    3. Victim submits relief request via HTTP API
+    4. Coordinator allocates resource via HTTP API
+    5. Volunteer checks notifications and task list via HTTP API
+    """
+    # 1. Register users
+    reg_coord = client.post("/auth/register", json={
+        "name": "HTTP Coordinator",
+        "email": "http_coord@test.org",
+        "password": "strong-password-1",
+        "role": "Coordinator"
+    })
+    # Victim registration
+    reg_vic = client.post("/auth/register", json={
+        "name": "HTTP Victim",
+        "email": "http_victim@test.org",
+        "password": "strong-password-1",
+    })
+    assert reg_coord.status_code == 201
+    assert reg_vic.status_code == 201
+    coord_id = reg_coord.json["user"]["user_id"]
+    vic_id = reg_vic.json["user"]["user_id"]
+
+    # Manually promote coord role in DB
+    with app.app_context():
+        user = db.session.get(User, coord_id)
+        user.role = ROLE_COORDINATOR
+        vol = register_user(
+            name="HTTP Volunteer",
+            email="http_vol@test.org",
+            password="strong-password-1",
+            role=ROLE_VOLUNTEER,
+        )
+        vol_id = vol.user_id
+        db.session.commit()
+
+    # 2. Coordinator registers inventory
+    with client.session_transaction() as sess:
+        sess["user_id"] = coord_id
+
+    inv_res = client.post("/inventory/", json={
+        "category": "Medical Supplies",
+        "quantity": 100,
+        "storage_location": "Field Hospital Alpha",
+        "threshold": 20,
+    })
+    assert inv_res.status_code == 201
+    item_id = inv_res.json["item"]["item_id"]
+
+    # 3. Victim places request
+    with client.session_transaction() as sess:
+        sess["user_id"] = vic_id
+
+    req_res = client.post("/requests/", json={
+        "category": "Medical Supplies",
+        "quantity": 15,
+        "urgency": "Critical",
+        "latitude": 13.04,
+        "longitude": 80.25,
+        "location": "Relief Tent 2",
+    })
+    assert req_res.status_code == 201
+    request_id = req_res.json["request"]["request_id"]
+
+    # 4. Coordinator allocates
+    with client.session_transaction() as sess:
+        sess["user_id"] = coord_id
+
+    alloc_res = client.post("/assignments/allocate", json={
+        "request_id": request_id,
+        "volunteer_id": vol_id,
+        "item_id": item_id,
+    })
+    assert alloc_res.status_code == 201
+    task_id = alloc_res.json["assignment"]["task_id"]
+
+    # 5. Volunteer views notifications
+    with client.session_transaction() as sess:
+        sess["user_id"] = vol_id
+
+    notif_res = client.get("/notifications/")
+    assert notif_res.status_code == 200
+    assert len(notif_res.json["notifications"]) >= 1
+
+    # 6. Volunteer completes task
+    comp_res = client.post(f"/assignments/{task_id}/complete")
+    assert comp_res.status_code == 200
+    assert comp_res.json["assignment"]["status"] == "Completed"
