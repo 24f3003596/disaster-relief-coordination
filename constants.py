@@ -1,0 +1,7 @@
+ROLES = ("Victim", "Volunteer", "Coordinator", "Admin")
+REQUEST_CATEGORIES = ("Food", "Water", "Medical Aid", "Shelter", "Rescue")
+URGENCY_LEVELS = ("Critical", "High", "Medium", "Low")
+REQUEST_STATUSES = ("Pending", "Assigned", "In Progress", "Fulfilled")
+ASSIGNMENT_STATUSES = ("Assigned", "Accepted", "In Progress", "Completed", "Unable to Complete")
+INCIDENT_SEVERITIES = ("Critical", "High", "Medium", "Low")
+INCIDENT_STATUSES = ("Open", "Monitoring", "Resolved", "Closed")

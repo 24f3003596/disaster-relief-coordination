@@ -1,0 +1,12 @@
+{% extends 'base.html' %}{% block content %}
+<h1>Emergency alert</h1>
+<p>Choose specific recipients or leave the selection empty to broadcast to Volunteers, Coordinators and Admins.</p>
+<form method="post" class="form-card">
+  <label class="form-label" for="message">Alert message</label>
+  <textarea id="message" class="form-control mb-3" name="message" required minlength="1"></textarea>
+  <label class="form-label" for="type">Type</label>
+  <select id="type" class="form-select mb-3" name="type"><option>Emergency</option><option>Critical Shortage</option><option>General</option></select>
+  <label class="form-label" for="recipients">Specific recipients (optional; use Ctrl to select multiple)</label>
+  <select id="recipients" class="form-select mb-3" name="recipient_user_ids" multiple size="5">{% for u in users %}<option value="{{u.user_id}}">#{{u.user_id}} — {{u.name}} ({{u.role}})</option>{% endfor %}</select>
+  <button class="btn btn-danger">Send emergency alert</button>
+</form>{% endblock %}
