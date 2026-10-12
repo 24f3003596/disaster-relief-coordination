@@ -114,13 +114,13 @@ def create_item_route():
         if request.is_json or request.headers.get("Accept") == "application/json":
             return jsonify({"message": "Inventory item registered", "item": item.to_dict()}), 201
         items = list_inventory_items()
-        return render_template("inventory.html", inventory=[i.to_dict() for i in items], message="Inventory item registered"), 200
+        return render_template("inventory.html", items=items, inventory=[i.to_dict() for i in items], message="Inventory item registered"), 200
     except ValueError as exc:
         db.session.rollback()
         if request.is_json or request.headers.get("Accept") == "application/json":
             return jsonify({"error": str(exc)}), 400
         items = list_inventory_items()
-        return render_template("inventory.html", inventory=[i.to_dict() for i in items], error=str(exc)), 400
+        return render_template("inventory.html", items=items, inventory=[i.to_dict() for i in items], error=str(exc)), 400
 
 @inventory_bp.get("/")
 def list_items_route():
@@ -133,7 +133,7 @@ def list_items_route():
             "inventory": items_dict,
             "total_items": len(items),
         }), 200
-    return render_template("inventory.html", inventory=items_dict), 200
+    return render_template("inventory.html", items=items, inventory=items_dict), 200
 
 @inventory_bp.get("/<int:item_id>")
 def get_item_route(item_id):
