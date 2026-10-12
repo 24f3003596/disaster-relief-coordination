@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}Assignments - Disaster Relief Coordination{% endblock %}
+{% block content %}
+<div class="row align-items-center mb-4">
+  <div class="col-md-8">
+    <h2 class="fw-bold mb-1"><i class="bi bi-person-check text-primary me-2"></i>Resource Allocation & Task Assignments</h2>
+    <p class="text-muted mb-0">Coordinate volunteer dispatches and track resource delivery fulfillments</p>
+  </div>
+</div>
+
+{% if message %}<div class="alert alert-success shadow-sm">{{ message }}</div>{% endif %}
+{% if error %}<div class="alert alert-danger shadow-sm">{{ error }}</div>{% endif %}
+
+<div class="card border-0 shadow-sm p-4 mb-4">
+  <h5 class="fw-bold mb-3">Allocate Resources</h5>
+  <form method="post" action="/assignments" class="row g-3">
+    <div class="col-md-4">
+      <label class="form-label fw-semibold">Pending Request</label>
+      <select class="form-select" name="request_id" required>
+        {% for r in requests %}
+        <option value="{{r.request_id}}">#{{r.request_id}} — {{r.category}} × {{r.quantity}} ({{r.urgency}})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label fw-semibold">Volunteer</label>
+      <select class="form-select" name="volunteer_id" required>
+        {% for v in volunteers %}
+        <option value="{{v.user_id}}">#{{v.user_id}} — {{v.name}}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label fw-semibold">Matching Stock Item</label>
+      <select class="form-select" name="item_id" required>
+        {% for i in items %}
+        <option value="{{i.item_id}}">#{{i.item_id}} — {{i.category}}, stock {{i.quantity}}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12">
+      <button class="btn btn-primary">Allocate resources</button>
+    </div>
+  </form>
+</div>
+
+<div class="card border-0 shadow-sm p-4">
+  <h5 class="fw-bold mb-3">Assignment Tracking</h5>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Task ID</th>
+          <th>Request ID</th>
+          <th>Volunteer</th>
+          <th>Item Category</th>
+          <th>Quantity Assigned</th>
+          <th>Status</th>
+          <th>Update Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if assignments %}
+          {% for a in assignments %}
+          <tr>
+            <td><span class="badge bg-light text-dark border">#{{a.task_id}}</span></td>
+            <td>#{{a.request_id}}</td>
+            <td>{{a.volunteer.name if a.volunteer else a.volunteer_id}}</td>
+            <td>{{a.item.category if a.item else a.item_id}}</td>
+            <td>{{a.quantity_assigned}}</td>
+            <td><span class="badge bg-info text-dark">{{a.status}}</span></td>
+            <td>
+              <form method="post" action="/assignments/{{a.task_id}}/status" class="d-flex gap-2">
+                <select name="status" class="form-select form-select-sm" style="width: auto;">
+                  {% for s in ['Assigned','Accepted','In Progress','Completed','Unable to Complete'] %}
+                  <option {% if s==a.status %}selected{% endif %}>{{s}}</option>
+                  {% endfor %}
+                </select>
+                <button class="btn btn-sm btn-outline-primary">Save</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-4">No assignments yet.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

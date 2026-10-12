@@ -10,6 +10,23 @@ from models import Assignment, Incident, InventoryItem, ReliefRequest
 
 reports_bp = Blueprint("reports", __name__)
 
+def generate_relief_report(start_date=None, end_date=None):
+    """Generate relief report dictionary."""
+    request_total = ReliefRequest.query.count()
+    incident_total = Incident.query.count()
+    inventory_total = InventoryItem.query.count()
+    inventory_quantity = db.session.query(
+        func.coalesce(func.sum(InventoryItem.quantity), 0)
+    ).scalar() or 0
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "requests_total": request_total,
+        "incidents_total": incident_total,
+        "inventory_total": inventory_total,
+        "inventory_units": int(inventory_quantity),
+    }
+
+
 
 @reports_bp.get("/summary")
 @roles_required("Coordinator", "Admin")

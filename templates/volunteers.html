@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% block content %}<h1>Relief volunteers</h1><table class="table table-striped"><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Assignments</th></tr>{% for v in volunteers %}<tr><td>{{v.user_id}}</td><td>{{v.name}}</td><td>{{v.email}}</td><td>{{v.phone or '—'}}</td><td>{{v.assignments|length}}</td></tr>{% endfor %}</table>{% endblock %}

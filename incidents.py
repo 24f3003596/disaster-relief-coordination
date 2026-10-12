@@ -1,12 +1,11 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 
 from extensions import db
 from models import Incident
 from auth import login_required, roles_required
+from constants import VALID_SEVERITIES, VALID_INCIDENT_STATUSES, STATUS_INCIDENT_OPEN, STATUS_INCIDENT_IN_PROGRESS
 
 incidents_bp = Blueprint("incidents", __name__)
-VALID_SEVERITIES = {"Low", "Medium", "High", "Critical"}
-VALID_STATUSES = {"Open", "In Progress", "Resolved", "Closed"}
 
 def create_incident(title, description, latitude, longitude, severity, reported_by):
     title = (title or "").strip()
@@ -35,17 +34,43 @@ def create_incident(title, description, latitude, longitude, severity, reported_
     db.session.commit()
     return incident
 
+def list_incidents(status=None):
+    """Retrieve list of incidents optionally filtered by status."""
+    query = Incident.query
+    if status:
+        if status not in VALID_INCIDENT_STATUSES:
+            raise ValueError("invalid status filter")
+        query = query.filter_by(status=status)
+    return query.order_by(Incident.created_at.desc()).all()
+
+def list_affected_areas(incident_id=None):
+    """Retrieve affected areas (active incidents)."""
+    query = Incident.query.filter(Incident.status.in_([STATUS_INCIDENT_OPEN, STATUS_INCIDENT_IN_PROGRESS]))
+    if incident_id is not None:
+        query = query.filter_by(incident_id=incident_id)
+    incidents = query.order_by(Incident.severity.desc()).all()
+    return [{
+        "incident_id": item.incident_id,
+        "title": item.title,
+        "latitude": item.latitude,
+        "longitude": item.longitude,
+        "severity": item.severity,
+        "status": item.status,
+    } for item in incidents]
+
 @incidents_bp.post("/")
 @login_required
 @roles_required("Coordinator", "Admin")
 def create_incident_route():
-    from flask import session
     data = request.get_json(silent=True) or {}
     try:
         incident = create_incident(
-            data.get("title"), data.get("description", ""),
-            data.get("latitude"), data.get("longitude"),
-            data.get("severity"), session["user_id"],
+            data.get("title"),
+            data.get("description", ""),
+            data.get("latitude"),
+            data.get("longitude"),
+            data.get("severity"),
+            session["user_id"],
         )
         return jsonify({"message": "Incident registered", "incident": incident.to_dict()}), 201
     except ValueError as exc:
@@ -55,23 +80,14 @@ def create_incident_route():
 @incidents_bp.get("/")
 def list_incidents_route():
     status = request.args.get("status")
-    query = Incident.query
-    if status:
-        if status not in VALID_STATUSES:
-            return jsonify({"error": "invalid status filter"}), 400
-        query = query.filter_by(status=status)
-    incidents = query.order_by(Incident.created_at.desc()).all()
-    return jsonify({"incidents": [incident.to_dict() for incident in incidents]}), 200
+    try:
+        incidents = list_incidents(status=status)
+        return jsonify({"incidents": [incident.to_dict() for incident in incidents]}), 200
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
 @incidents_bp.get("/affected-areas")
 def affected_areas_route():
-    incidents = Incident.query.filter(Incident.status.in_(["Open", "In Progress"])).order_by(Incident.severity.desc()).all()
-    areas = [{
-        "incident_id": item.incident_id,
-        "title": item.title,
-        "latitude": item.latitude,
-        "longitude": item.longitude,
-        "severity": item.severity,
-        "status": item.status,
-    } for item in incidents]
+    incident_id = request.args.get("incident_id", type=int)
+    areas = list_affected_areas(incident_id=incident_id)
     return jsonify({"affected_areas": areas}), 200

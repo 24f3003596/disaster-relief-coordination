@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center py-4">
+  <div class="col-md-6">
+    <div class="card p-4 shadow-sm border-0">
+      <h3 class="fw-bold mb-3">Register User</h3>
+      {% if message %}<div class="alert alert-success">{{ message }}</div>{% endif %}
+      {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+      <form method="post">
+        <label class="form-label fw-semibold">Name</label>
+        <input class="form-control mb-3" name="name" required placeholder="Full Name">
+        <label class="form-label fw-semibold">Phone</label>
+        <input class="form-control mb-3" name="phone" placeholder="Contact Phone">
+        <label class="form-label fw-semibold">Email</label>
+        <input class="form-control mb-3" name="email" type="email" required placeholder="name@example.com">
+        <label class="form-label fw-semibold">Password (8+ characters)</label>
+        <input class="form-control mb-3" name="password" type="password" required minlength="8" placeholder="Password">
+        <label class="form-label fw-semibold">Role</label>
+        <select class="form-select mb-3" name="role">
+          <option value="Victim">Victim</option>
+          <option value="Volunteer">Volunteer</option>
+          <option value="Coordinator">Coordinator</option>
+          <option value="Admin">Admin</option>
+        </select>
+        <button class="btn btn-primary w-100">Register</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

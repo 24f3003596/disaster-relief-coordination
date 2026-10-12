@@ -1,8 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
 .venv/
 venv/
-__pycache__/
-.pytest_cache/
-*.py[cod]
 instance/
 *.db
 .env
