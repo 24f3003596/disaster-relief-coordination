@@ -1,4 +1,5 @@
 """End-to-end Flask client test for the relief allocation workflow."""
+from auth import register_user
 from extensions import db
 from models import User, InventoryItem, ReliefRequest, Assignment, Notification
 
@@ -20,10 +21,31 @@ def test_register_request_allocate_complete_and_notify(client, app):
     assert response.status_code == 200
     assert b'Account created' in response.data
 
+    # Public registration ignores the submitted Volunteer role. An administrator
+    # must explicitly assign that role through the protected role-management API.
     with app.app_context():
         victim = User.query.filter_by(email='victim-flow@example.com').one()
         volunteer = User.query.filter_by(email='volunteer-flow@example.com').one()
+        assert victim.role == 'Victim'
+        assert volunteer.role == 'Victim'
         victim_id, volunteer_id = victim.user_id, volunteer.user_id
+        register_user(
+            name='Test Provisioned Admin',
+            email='admin-flow@example.com',
+            password='adminpass123',
+            role='Admin',
+        )
+
+    admin_login = client.post('/auth/login', json={
+        'email': 'admin-flow@example.com', 'password': 'adminpass123'
+    })
+    assert admin_login.status_code == 200
+    promote_response = client.patch(
+        f'/auth/users/{volunteer_id}/role', json={'role': 'Volunteer'}
+    )
+    assert promote_response.status_code == 200
+    assert promote_response.json['user']['role'] == 'Volunteer'
+    client.post('/auth/logout')
 
     # Registered users must be available in the Requester dropdown.
     response = client.get('/requests')

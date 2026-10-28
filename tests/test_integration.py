@@ -178,20 +178,41 @@ def test_automated_workflow_via_http_client(client, app):
     })
     assert reg_coord.status_code == 201
     assert reg_vic.status_code == 201
+    assert reg_coord.json["user"]["role"] == ROLE_VICTIM
+    assert reg_vic.json["user"]["role"] == ROLE_VICTIM
     coord_id = reg_coord.json["user"]["user_id"]
     vic_id = reg_vic.json["user"]["user_id"]
 
     with app.app_context():
-        user = db.session.get(User, coord_id)
-        user.role = ROLE_COORDINATOR
+        admin = register_user(
+            name="Provisioned HTTP Admin",
+            email="http_admin@test.org",
+            password="strong-password-1",
+            role="Admin",
+        )
         vol = register_user(
             name="HTTP Volunteer",
             email="http_vol@test.org",
             password="strong-password-1",
             role=ROLE_VOLUNTEER,
         )
+        admin_email = admin.email
         vol_id = vol.user_id
-        db.session.commit()
+
+    # Public registration cannot assign Coordinator or Volunteer permissions.
+    # Promote accounts through the Admin-protected role-management endpoint.
+    admin_login = client.post("/auth/login", json={
+        "email": admin_email, "password": "strong-password-1"
+    })
+    assert admin_login.status_code == 200
+    coord_promotion = client.patch(
+        f"/auth/users/{coord_id}/role", json={"role": ROLE_COORDINATOR}
+    )
+    volunteer_promotion = client.patch(
+        f"/auth/users/{vol_id}/role", json={"role": ROLE_VOLUNTEER}
+    )
+    assert coord_promotion.status_code == 200
+    assert volunteer_promotion.status_code == 200
 
     # 2. Coordinator registers inventory
     with client.session_transaction() as sess:

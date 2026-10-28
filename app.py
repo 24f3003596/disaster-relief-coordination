@@ -2,6 +2,7 @@ from datetime import datetime
 from flask import Flask, jsonify, request, redirect, url_for, render_template, session, flash
 
 from extensions import db
+from constants import ROLE_VICTIM
 from auth import auth_bp, register_user, authenticate_user
 from incidents import incidents_bp
 from reports import reports_bp
@@ -90,7 +91,8 @@ def create_app(test_config=None):
                     phone=data.get("phone"),
                     email=data.get("email"),
                     password=data.get("password"),
-                    role=data.get("role", "Victim"),
+                    # Do not trust a role supplied in a public HTML form.
+                    role=ROLE_VICTIM,
                 )
                 return render_template("register.html", message="Account created", user=user), 200
             except ValueError as e:

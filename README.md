@@ -92,6 +92,12 @@ disaster-relief-coordination/
 
 ---
 
+## 🔐 Public Registration and Role Security
+
+Public registration through both `/auth/register` (JSON API) and `/register` (browser form) always creates a `Victim` account. Any `role` value submitted by a public client is ignored; users cannot grant themselves `Volunteer`, `Coordinator`, or `Admin` permissions. The browser registration form does not offer a role selector. Role changes are handled through `PATCH /auth/users/<user_id>/role`, which requires an authenticated `Admin` account.
+
+---
+
 ## 🚀 Setup & Execution
 
 ### Prerequisites
@@ -130,19 +136,17 @@ Open **`http://127.0.0.1:5000/`** in your browser.
 ```bash
 pytest -v
 ```
-**Result**: 45 passed, 0 failures (100% pass rate).
+Use the actual output from your current checkout as the source of truth. Test counts, coverage, and complexity metrics must be regenerated after code or tests change; previously recorded figures may no longer apply.
 
 ### Run Test Coverage
 ```bash
 pytest --cov=. --cov-report=term-missing
 ```
-**Coverage**: **86% statement coverage** across all modules and blueprints.
 
 ### Run Cyclomatic Complexity Check (Radon)
 ```bash
 radon cc . -s -a
 ```
-**Complexity Rating**: **Grade A (average 4.01)** across all 133 functions, methods, and classes.
 
 ---
 
