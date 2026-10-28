@@ -121,14 +121,14 @@ def update_user_role(user_id, new_role, actor_id=None):
 def register_route():
     data = request.get_json(silent=True) or {}
     try:
-        # Public registration creates Victim accounts by default
-        role = data.get("role", ROLE_VICTIM)
+        # Public registration must not allow callers to choose their role.
+        # Elevated roles are assigned through the Admin-protected role endpoint.
         user = register_user(
             name=data.get("name"),
             phone=data.get("phone"),
             email=data.get("email"),
             password=data.get("password"),
-            role=role,
+            role=ROLE_VICTIM,
         )
         return jsonify({"message": "User registered", "user": user.to_dict()}), 201
     except ValueError as exc:
