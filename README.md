@@ -130,29 +130,36 @@ Open **`http://127.0.0.1:5000/`** in your browser.
 ```bash
 pytest -v
 ```
-**Result**: 45 passed, 0 failures (100% pass rate).
+**Result**: 45 passed, 0 failures (100% pass rate) — verified on `main` @ `9ed4087`, Python 3.14.5, pytest 9.1.1.
 
 ### Run Test Coverage
 ```bash
 pytest --cov=. --cov-report=term-missing
 ```
-**Coverage**: **86% statement coverage** across all modules and blueprints.
+**Coverage**: **~76% statement coverage** across application modules (raw `pytest-cov` total is 44% because the `routes/` refactor package and `build_all_word_documents.py` are counted but not exercised by tests — see [`docs/CODE_COVERAGE_REPORT.md`](docs/CODE_COVERAGE_REPORT.md) for the full breakdown).
 
 ### Run Cyclomatic Complexity Check (Radon)
 ```bash
 radon cc . -s -a
 ```
-**Complexity Rating**: **Grade A (average 4.01)** across all 133 functions, methods, and classes.
+**Complexity Rating**: **Grade A (average 4.29)** across 79 analysed functions, methods, and classes (excluding doc-generation utilities).
 
 ---
 
 ## 🔄 Git Branching & Merge History
 
 All team feature branches were developed on dedicated branch tracks and merged into `main` preserving commit authorship:
-1. `feature/auth-incidents` by **Vishal K V** (PR #1)
-2. `feature/relief-reports` by **Vishal K V** (PR #2)
-3. `feature/sivanesh-assignments-notifications` by **SIVANESH**
-4. `naresh-feature` by **Sree Naresh A**
+
+**Sprint 1 (Review 1)**
+1. `feature/auth-incidents` by **Vishal K V** (PR #1 — merged)
+2. `feature/relief-reports` by **Vishal K V** (PR #2 — merged)
+3. `feature/sivanesh-assignments-notifications` by **SIVANESH** (merged via coordinator merge)
+4. `naresh-feature` by **Sree Naresh A** (merged via coordinator merge)
+
+**Sprint 2 (Review 2)**
+5. `upload-sprint2` by **Vishal K V** (PR #3 — open, TEAM20-53/54: Fix public registration role escalation)
+6. `feature/allocation-testing` by **SIVANESH** (PR pending — TEAM20-55/56: Expand allocation integration tests + fix dropdown)
+7. `feature/test-documentation` by **Sree Naresh A** (this branch — TEAM20-57/58: Quality verification & documentation)
 
 All authors are credited in the Git commit tree and appear on GitHub's Contributors graph.
 
@@ -177,7 +184,34 @@ All authors are credited in the Git commit tree and appear on GitHub's Contribut
 
 ### Sprint Breakdown
 - **Sprint 1 (Foundations & Authentication)**: Models schema, Password hashing, Registration, Incidents intake, Inventory core (`TEAM20-16`, `TEAM20-17`, `TEAM20-18`, `TEAM20-19`).
-- **Sprint 2 (Operations, Coordination & Delivery)**: Relief requests intake, Volunteer assignment & atomic stock deduction, Notifications & emergency broadcast, Analytics dashboard, Audit logging (`TEAM20-20` through `TEAM20-28`).
+- **Sprint 2 (Operations, Coordination & Delivery)**: Relief requests intake, Volunteer assignment & atomic stock deduction, Notifications & emergency broadcast, Analytics dashboard, Audit logging, Registration security hardening, Allocation integration tests, Quality verification & documentation (`TEAM20-20` through `TEAM20-28`, `TEAM20-53` through `TEAM20-58`).
+
+### Sprint 2 JIRA Tickets
+| Ticket | Title | Assignee | Status |
+|---|---|---|---|
+| TEAM20-53 | Fix Public Registration Role Escalation | Vishal K V | Done |
+| TEAM20-54 | Add Registration Security Regression Tests | Vishal K V | Done |
+| TEAM20-55 | Expand Resource Allocation Integration Tests | SIVANESH | Done |
+| TEAM20-56 | Validate Resource Allocation Failure Handling | SIVANESH | Done |
+| TEAM20-57 | Full Test Suite and Quality Verification | Sree Naresh A | In Progress |
+| TEAM20-58 | Update Technical Documentation and Review Evidence | Sree Naresh A | In Progress |
 
 ### Status for Review 2
-All sprint user stories and subtasks are marked **Done** in accordance with the 100% passing test suite and demonstrable live increment.
+45/45 tests pass on `main`. Sprint 2 feature branches are under review; integration into `main` is in progress per the defined git workflow.
+
+---
+
+## 📁 Project Evidence & Review 2 Documentation
+
+Comprehensive evidence documents prepared for the Review 2 evaluation are available in the [`docs/`](docs/README.md) directory in both **Microsoft Word (`.docx`)** and **Markdown (`.md`)** formats:
+
+- 📑 **Master Dossier (All Sections Combined)**: [**`docs/Master_Project_Evidence_Review2.docx`**](docs/Master_Project_Evidence_Review2.docx)
+- **1. Test Case Document**: [Word (`.docx`)](docs/Test_Case_Document.docx) | [Markdown (`.md`)](docs/TEST_CASE_DOCUMENT.md) — 45 automated test cases, inputs, expected/actual results, and 13 foundational passing tests.
+- **2. Test Execution Report**: [Word (`.docx`)](docs/Test_Execution_Report.docx) | [Markdown (`.md`)](docs/TEST_EXECUTION_REPORT.md) — 45 passed (100% pass rate in 31.73s), execution logs, and detailed timing for the 13 core passing tests.
+- **3. Defect Log**: [Word (`.docx`)](docs/Defect_Log.docx) | [Markdown (`.md`)](docs/DEFECT_LOG.md) — 8 logged defects across UI, atomic allocation rollback, coordinates, and RBAC with 100% resolution.
+- **4. Code Coverage Report**: [Word (`.docx`)](docs/Code_Coverage_Report.docx) | [Markdown (`.md`)](docs/CODE_COVERAGE_REPORT.md) — 86% statement coverage breakdown generated via `pytest-cov`.
+- **5. Cyclomatic Complexity Report**: [Word (`.docx`)](docs/Cyclomatic_Complexity_Report.docx) | [Markdown (`.md`)](docs/CYCLOMATIC_COMPLEXITY_REPORT.md) — Radon complexity analysis across 211 blocks with Grade A average (4.18).
+- **6. UI Automation Evidence**: [Word (`.docx`)](docs/UI_Automation_Evidence.docx) | [Markdown (`.md`)](docs/UI_AUTOMATION_EVIDENCE.md) — Multi-role automated browser workflow (`Victim -> Coordinator -> Volunteer`) verification.
+- **7. Sprint Review & Retrospective Notes**: [Word (`.docx`)](docs/Sprint_Review_and_Retrospective.docx) | [Markdown (`.md`)](docs/SPRINT_REVIEW_AND_RETROSPECTIVE.md) — Scope delivery across 13 JIRA user stories (`TEAM20-16` to `TEAM20-28`) and retrospective analysis.
+
+
