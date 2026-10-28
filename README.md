@@ -136,19 +136,19 @@ Open **`http://127.0.0.1:5000/`** in your browser.
 ```bash
 pytest -v
 ```
-**Result**: 45 passed, 0 failures (100% pass rate) — verified on `main` post Sprint 2 integration, Python 3.14.5, pytest 9.1.1. Always re-run after any code or test change to get current figures.
+**Result**: 62 passed, 0 failures (100% pass rate) — verified on `main` post Sprint 2 integration, Python 3.14.5, pytest 9.1.1. (Baseline pre-integration: 45 passed; +17 new tests added in Sprint 2). Always re-run after any code or test change to get current figures.
 
 ### Run Test Coverage
 ```bash
 pytest --cov=. --cov-report=term-missing
 ```
-**Coverage**: **~76% statement coverage** across application modules (raw `pytest-cov` total is 44% because the `routes/` refactor package and `build_all_word_documents.py` are counted but not exercised by tests — see [`docs/CODE_COVERAGE_REPORT.md`](docs/CODE_COVERAGE_REPORT.md) for the full breakdown).
+**Coverage**: **~76% statement coverage** across core application modules (~85% including test suite; raw `pytest-cov` total is 46% because the `routes/` and `core/` refactor packages and `build_all_word_documents.py` are counted but not exercised by tests — see [`docs/CODE_COVERAGE_REPORT.md`](docs/CODE_COVERAGE_REPORT.md) for the full breakdown).
 
 ### Run Cyclomatic Complexity Check (Radon)
 ```bash
 radon cc . -s -a
 ```
-**Complexity Rating**: **Grade A (average 4.29)** across 79 analysed functions, methods, and classes (excluding doc-generation utilities).
+**Complexity Rating**: **Grade A (average 4.05)** across 240 analysed functions, methods, and classes.
 
 ---
 
@@ -203,7 +203,7 @@ All authors are credited in the Git commit tree and appear on GitHub's Contribut
 | TEAM20-58 | Update Technical Documentation and Review Evidence | Sree Naresh A | Done |
 
 ### Status for Review 2
-All 6 Sprint 2 tickets are **Done**. All feature branches merged into `main`. Post-integration test suite: **passed** (see `docs/TEST_EXECUTION_REPORT.md`).
+All 6 Sprint 2 tickets are **Done**. All feature branches merged into `main`. Post-integration test suite: **62 passed, 0 failures (100% pass rate)** (see [`docs/TEST_EXECUTION_REPORT.md`](docs/TEST_EXECUTION_REPORT.md)).
 
 ---
 
