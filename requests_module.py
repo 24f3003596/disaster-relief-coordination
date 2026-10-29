@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request, session, render_template
 
 from extensions import db
 from models import ReliefRequest, User, Incident
+from auth import login_required, roles_required
 from audit import log_action
 from constants import (
     VALID_CATEGORIES,
@@ -120,10 +121,17 @@ def update_request_status(request_id, new_status, actor_id=None):
     return req
 
 @requests_bp.post("/")
+@login_required
 def create_request_route():
     data = request.get_json(silent=True) or request.form or {}
     try:
-        user_id = data.get("user_id") or session.get("user_id")
+        # Never trust a client-supplied owner ID; bind the request to the session user.
+        user_id = session.get("user_id")
+        actor = db.session.get(User, user_id)
+        if actor is None:
+            return jsonify({"error": "Authentication required"}), 401
+        if actor.role not in ("Victim", "Coordinator", "Admin"):
+            return jsonify({"error": "Insufficient permissions"}), 403
         req = create_relief_request(
             user_id=user_id,
             category=data.get("category"),
@@ -146,9 +154,21 @@ def create_request_route():
         return render_template("requests.html", requests=[r.to_dict() for r in requests_list], users=User.query.all(), error=str(exc)), 400
 
 @requests_bp.get("/")
+@login_required
 def list_requests_route():
     status = request.args.get("status")
-    user_id = request.args.get("user_id", type=int)
+    actor = db.session.get(User, session.get("user_id"))
+    if actor is None:
+        session.clear()
+        return jsonify({"error": "Authentication required"}), 401
+    requested_user_id = request.args.get("user_id", type=int)
+    if actor.role == "Victim":
+        # Victims can only see their own requests, even if they supply another user_id.
+        user_id = actor.user_id
+    elif actor.role in ("Coordinator", "Admin"):
+        user_id = requested_user_id
+    else:
+        return jsonify({"error": "Insufficient permissions"}), 403
     try:
         requests_list = list_relief_requests(status=status, user_id=user_id)
         requests_dict = [r.to_dict() for r in requests_list]
@@ -163,13 +183,23 @@ def list_requests_route():
         return jsonify({"error": str(exc)}), 400
 
 @requests_bp.get("/<int:request_id>")
+@login_required
 def get_request_route(request_id):
     req = db.session.get(ReliefRequest, request_id)
     if not req:
         return jsonify({"error": "Relief request not found"}), 404
+    actor = db.session.get(User, session.get("user_id"))
+    if actor is None:
+        return jsonify({"error": "Authentication required"}), 401
+    if actor.role not in ("Coordinator", "Admin") and req.user_id != actor.user_id:
+        return jsonify({"error": "Insufficient permissions"}), 403
+    if actor.role not in ("Victim", "Coordinator", "Admin"):
+        return jsonify({"error": "Insufficient permissions"}), 403
     return jsonify({"request": req.to_dict()}), 200
 
 @requests_bp.patch("/<int:request_id>/status")
+@login_required
+@roles_required("Coordinator", "Admin")
 def update_request_status_route(request_id):
     data = request.get_json(silent=True) or request.form or {}
     new_status = data.get("status")

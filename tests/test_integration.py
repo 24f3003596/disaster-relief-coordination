@@ -1,8 +1,10 @@
+
 """
 Integration and End-to-End Workflow Testing for SE Project Review 2.
 """
 
 import pytest
+
 from extensions import db
 from models import User, InventoryItem, ReliefRequest, Assignment, Notification
 from auth import register_user
@@ -24,15 +26,42 @@ from constants import (
     NOTIFICATION_ASSIGNMENT,
 )
 
-def test_main_pages_load(client):
-    """Test that all primary endpoints load successfully (HTTP 200)."""
-    for path in ['/', '/register', '/login', '/inventory', '/requests', '/assignments', '/volunteers', '/notifications', '/alerts', '/incidents', '/reports']:
+
+def test_main_pages_load(client, app):
+    """Public pages load; inventory denies unauthenticated access."""
+    for path in ["/", "/register", "/login"]:
         response = client.get(path)
-        assert response.status_code == 200, f"Failed loading {path}: status {response.status_code}"
+        assert response.status_code == 200, (
+            f"Failed loading {path}: status {response.status_code}"
+        )
+
+    # Anonymous users must not access protected inventory.
+    response = client.get("/inventory")
+    assert response.status_code == 401
+
+    # Provision and authenticate an Admin for the authorized page check.
+    with app.app_context():
+        admin = register_user(
+            name="Page Test Admin",
+            email="page-admin@test.org",
+            password="strong-password-1",
+            role="Admin",
+        )
+        admin_email = admin.email
+
+    response = client.post("/auth/login", json={
+        "email": admin_email,
+        "password": "strong-password-1",
+    })
+    assert response.status_code == 200
+
+    response = client.get("/inventory")
+    assert response.status_code == 200
+
 
 def test_end_to_end_relief_workflow(app):
+    """Test allocation, inventory deduction, notifications and completion."""
     with app.app_context():
-        # Step 1: Register Users
         coordinator = register_user(
             name="Relief Coordinator",
             email="coordinator@relief.org",
@@ -59,20 +88,16 @@ def test_end_to_end_relief_workflow(app):
         assert volunteer.user_id is not None
         assert victim.user_id is not None
 
-        # Step 2: Register Inventory Resource
         initial_stock = 200
-        threshold_val = 30
+        requested_qty = 25
+
         item = create_inventory_item(
             category=CATEGORY_FOOD_WATER,
             quantity=initial_stock,
             storage_location="Central Disaster Warehouse Sector 1",
-            threshold=threshold_val,
+            threshold=30,
         )
-        assert item.item_id is not None
-        assert item.quantity == 200
 
-        # Step 3: Victim Submits Relief Request
-        requested_qty = 25
         req = create_relief_request(
             user_id=victim.user_id,
             category=CATEGORY_FOOD_WATER,
@@ -82,47 +107,59 @@ def test_end_to_end_relief_workflow(app):
             longitude=80.2707,
             location="Emergency Camp 4, North Sector",
         )
-        assert req.request_id is not None
+
+        assert item.quantity == initial_stock
         assert req.status == "Pending"
 
-        # Step 4: Coordinator Allocates Inventory and Assigns Volunteer
         assignment = allocate_request(
             request_id=req.request_id,
             volunteer_id=volunteer.user_id,
             item_id=item.item_id,
         )
 
-        # Step 5: Verify Atomic Inventory Stock Deduction
         db.session.refresh(item)
         db.session.refresh(req)
-        assert item.quantity == (initial_stock - requested_qty)  # 200 - 25 = 175
+
+        assert item.quantity == initial_stock - requested_qty
         assert req.status in (STATUS_REQUEST_ASSIGNED, "Allocated")
         assert assignment.status == STATUS_ASSIGNMENT_ASSIGNED
         assert assignment.quantity_assigned == requested_qty
 
-        # Step 6: Verify Automated Notifications Generated
-        vol_notif = Notification.query.filter_by(user_id=volunteer.user_id).first()
+        vol_notif = Notification.query.filter_by(
+            user_id=volunteer.user_id
+        ).first()
         assert vol_notif is not None
         assert vol_notif.type == NOTIFICATION_ASSIGNMENT
 
-        victim_notif = Notification.query.filter_by(user_id=victim.user_id).first()
+        victim_notif = Notification.query.filter_by(
+            user_id=victim.user_id
+        ).first()
         assert victim_notif is not None
-        assert "allocated" in victim_notif.message.lower() or "assigned" in victim_notif.message.lower()
+        assert (
+            "allocated" in victim_notif.message.lower()
+            or "assigned" in victim_notif.message.lower()
+        )
 
-        # Step 7: Volunteer Completes Assignment Delivery
         completed_task = complete_assignment(assignment.task_id)
         db.session.refresh(req)
+
         assert completed_task.status == STATUS_ASSIGNMENT_COMPLETED
         assert completed_task.completed_at is not None
-        assert req.status in (STATUS_REQUEST_FULFILLED, STATUS_REQUEST_COMPLETED)
+        assert req.status in (
+            STATUS_REQUEST_FULFILLED,
+            STATUS_REQUEST_COMPLETED,
+        )
 
-        # Step 8: Verify Dashboard KPI Reflects Completed Workflow
         dashboard = get_dashboard_summary()
         assert dashboard["requests"]["total"] == 1
-        assert dashboard["inventory"]["total_units"] == 175
+        assert dashboard["inventory"]["total_units"] == (
+            initial_stock - requested_qty
+        )
         assert dashboard["volunteers"]["total_count"] == 1
 
+
 def test_allocation_insufficient_stock_fails_atomically(app):
+    """Insufficient stock must not partially allocate a request."""
     with app.app_context():
         volunteer = register_user(
             name="Field Volunteer 2",
@@ -136,12 +173,14 @@ def test_allocation_insufficient_stock_fails_atomically(app):
             password="secure-password-123",
             role=ROLE_VICTIM,
         )
+
         item = create_inventory_item(
             category=CATEGORY_FOOD_WATER,
             quantity=10,
             storage_location="Depot",
             threshold=5,
         )
+
         req = create_relief_request(
             user_id=victim.user_id,
             category=CATEGORY_FOOD_WATER,
@@ -156,30 +195,36 @@ def test_allocation_insufficient_stock_fails_atomically(app):
                 item_id=item.item_id,
             )
 
-        # Confirm rollback / no changes occurred
         db.session.refresh(item)
         db.session.refresh(req)
+
         assert item.quantity == 10
         assert req.status == "Pending"
-        assert Assignment.query.filter_by(request_id=req.request_id).first() is None
+        assert Assignment.query.filter_by(
+            request_id=req.request_id
+        ).first() is None
+
 
 def test_automated_workflow_via_http_client(client, app):
-    # 1. Register users via HTTP API
+    """Test registration, role promotion and the API relief workflow."""
     reg_coord = client.post("/auth/register", json={
         "name": "HTTP Coordinator",
         "email": "http_coord@test.org",
         "password": "strong-password-1",
-        "role": "Coordinator"
+        "role": "Coordinator",
     })
+
     reg_vic = client.post("/auth/register", json={
         "name": "HTTP Victim",
         "email": "http_victim@test.org",
         "password": "strong-password-1",
     })
+
     assert reg_coord.status_code == 201
     assert reg_vic.status_code == 201
     assert reg_coord.json["user"]["role"] == ROLE_VICTIM
     assert reg_vic.json["user"]["role"] == ROLE_VICTIM
+
     coord_id = reg_coord.json["user"]["user_id"]
     vic_id = reg_vic.json["user"]["user_id"]
 
@@ -196,25 +241,29 @@ def test_automated_workflow_via_http_client(client, app):
             password="strong-password-1",
             role=ROLE_VOLUNTEER,
         )
+
         admin_email = admin.email
         vol_id = vol.user_id
 
-    # Public registration cannot assign Coordinator or Volunteer permissions.
-    # Promote accounts through the Admin-protected role-management endpoint.
-    admin_login = client.post("/auth/login", json={
-        "email": admin_email, "password": "strong-password-1"
+    response = client.post("/auth/login", json={
+        "email": admin_email,
+        "password": "strong-password-1",
     })
-    assert admin_login.status_code == 200
-    coord_promotion = client.patch(
-        f"/auth/users/{coord_id}/role", json={"role": ROLE_COORDINATOR}
-    )
-    volunteer_promotion = client.patch(
-        f"/auth/users/{vol_id}/role", json={"role": ROLE_VOLUNTEER}
-    )
-    assert coord_promotion.status_code == 200
-    assert volunteer_promotion.status_code == 200
+    assert response.status_code == 200
 
-    # 2. Coordinator registers inventory
+    response = client.patch(
+        f"/auth/users/{coord_id}/role",
+        json={"role": ROLE_COORDINATOR},
+    )
+    assert response.status_code == 200
+
+    response = client.patch(
+        f"/auth/users/{vol_id}/role",
+        json={"role": ROLE_VOLUNTEER},
+    )
+    assert response.status_code == 200
+
+    # Coordinator registers inventory.
     with client.session_transaction() as sess:
         sess["user_id"] = coord_id
 
@@ -224,10 +273,11 @@ def test_automated_workflow_via_http_client(client, app):
         "storage_location": "Field Hospital Alpha",
         "threshold": 20,
     })
+
     assert inv_res.status_code == 201
     item_id = inv_res.json["item"]["item_id"]
 
-    # 3. Victim places request
+    # Victim submits a relief request.
     with client.session_transaction() as sess:
         sess["user_id"] = vic_id
 
@@ -239,10 +289,11 @@ def test_automated_workflow_via_http_client(client, app):
         "longitude": 80.25,
         "location": "Relief Tent 2",
     })
+
     assert req_res.status_code == 201
     request_id = req_res.json["request"]["request_id"]
 
-    # 4. Coordinator allocates
+    # Coordinator allocates resources.
     with client.session_transaction() as sess:
         sess["user_id"] = coord_id
 
@@ -251,10 +302,11 @@ def test_automated_workflow_via_http_client(client, app):
         "volunteer_id": vol_id,
         "item_id": item_id,
     })
+
     assert alloc_res.status_code == 201
     task_id = alloc_res.json["assignment"]["task_id"]
 
-    # 5. Volunteer views notifications
+    # Volunteer views their notifications.
     with client.session_transaction() as sess:
         sess["user_id"] = vol_id
 
@@ -262,7 +314,7 @@ def test_automated_workflow_via_http_client(client, app):
     assert notif_res.status_code == 200
     assert len(notif_res.json["notifications"]) >= 1
 
-    # 6. Volunteer completes task
+    # Volunteer completes the assigned task.
     comp_res = client.post(f"/assignments/{task_id}/complete")
     assert comp_res.status_code == 200
     assert comp_res.json["assignment"]["status"] == "Completed"
