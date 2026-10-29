@@ -3,6 +3,7 @@ from flask import Blueprint, jsonify, request, session, has_request_context, ren
 
 from extensions import db
 from models import InventoryItem
+from auth import login_required, roles_required
 from audit import log_action
 from constants import VALID_CATEGORIES, ACTION_CREATE_INVENTORY, ACTION_UPDATE_INVENTORY
 
@@ -101,6 +102,8 @@ def update_inventory_stock(item_id, quantity_change, actor_id=None):
     return item
 
 @inventory_bp.post("/")
+@login_required
+@roles_required("Coordinator", "Admin")
 def create_item_route():
     data = request.get_json(silent=True) or request.form or {}
     try:
@@ -123,6 +126,8 @@ def create_item_route():
         return render_template("inventory.html", items=items, inventory=[i.to_dict() for i in items], error=str(exc)), 400
 
 @inventory_bp.get("/")
+@login_required
+@roles_required("Coordinator", "Admin")
 def list_items_route():
     category = request.args.get("category")
     available_only = request.args.get("available_only", "false").lower() in ("true", "1", "yes")
@@ -149,6 +154,8 @@ def list_items_route():
     return render_template("inventory.html", items=items, inventory=items_dict), 200
 
 @inventory_bp.get("/<int:item_id>")
+@login_required
+@roles_required("Coordinator", "Admin")
 def get_item_route(item_id):
     item = db.session.get(InventoryItem, item_id)
     if not item:
@@ -156,6 +163,8 @@ def get_item_route(item_id):
     return jsonify({"item": item.to_dict()}), 200
 
 @inventory_bp.get("/low-stock")
+@login_required
+@roles_required("Coordinator", "Admin")
 def low_stock_route():
     items = InventoryItem.query.filter(InventoryItem.quantity <= InventoryItem.threshold).all()
     return jsonify({"low_stock_items": [item.to_dict() for item in items]}), 200
