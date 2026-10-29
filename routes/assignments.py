@@ -230,6 +230,8 @@ def complete_assignment(task_id):
     return update_assignment_status(task_id, STATUS_ASSIGNMENT_COMPLETED)
 
 @assignments_bp.post("/allocate")
+@login_required
+@roles_required("Coordinator", "Admin")
 def allocate_route():
     data = request.get_json(silent=True) or request.form or {}
     req_id = data.get("request_id")
@@ -250,14 +252,35 @@ def allocate_route():
         return jsonify({"error": str(exc)}), 400
 
 @assignments_bp.get("/")
+@login_required
 def list_assignments_route():
     status = request.args.get("status")
     volunteer_id = request.args.get("volunteer_id", type=int)
+    actor = db.session.get(User, session.get("user_id"))
+    if actor is None:
+        session.clear()
+        return jsonify({"error": "Authentication required"}), 401
+    if actor.role == ROLE_VOLUNTEER:
+        volunteer_id = actor.user_id
+    elif actor.role not in ("Coordinator", "Admin"):
+        return jsonify({"error": "Insufficient permissions"}), 403
     tasks = list_assignments(status=status, volunteer_id=volunteer_id)
     return jsonify({"assignments": [t.to_dict() for t in tasks]}), 200
 
 @assignments_bp.patch("/<int:task_id>/status")
+@login_required
 def update_status_route(task_id):
+    actor = db.session.get(User, session.get("user_id"))
+    assignment = db.session.get(Assignment, task_id)
+    if assignment is None:
+        return jsonify({"error": "Assignment not found"}), 404
+    if actor is None:
+        return jsonify({"error": "Authentication required"}), 401
+    if actor.role == ROLE_VOLUNTEER:
+        if assignment.volunteer_id != actor.user_id:
+            return jsonify({"error": "Insufficient permissions"}), 403
+    elif actor.role not in ("Coordinator", "Admin"):
+        return jsonify({"error": "Insufficient permissions"}), 403
     data = request.get_json(silent=True) or request.form or {}
     new_status = data.get("status")
     try:
@@ -268,7 +291,19 @@ def update_status_route(task_id):
         return jsonify({"error": str(exc)}), 400
 
 @assignments_bp.post("/<int:task_id>/complete")
+@login_required
 def complete_route(task_id):
+    actor = db.session.get(User, session.get("user_id"))
+    assignment = db.session.get(Assignment, task_id)
+    if assignment is None:
+        return jsonify({"error": "Assignment not found"}), 404
+    if actor is None:
+        return jsonify({"error": "Authentication required"}), 401
+    if actor.role == ROLE_VOLUNTEER:
+        if assignment.volunteer_id != actor.user_id:
+            return jsonify({"error": "Insufficient permissions"}), 403
+    elif actor.role not in ("Coordinator", "Admin"):
+        return jsonify({"error": "Insufficient permissions"}), 403
     try:
         task = complete_assignment(task_id)
         return jsonify({"message": "Assignment completed", "assignment": task.to_dict()}), 200

@@ -291,6 +291,13 @@ def test_allocate_route_missing_parameters_returns_400_without_state_change(app,
     """AC4 & AC5: API route rejects missing payload fields with 400 without crashing with 500."""
     with app.app_context():
         stock_before = db.session.get(InventoryItem, seed["item"]).quantity
+        coord = User(name="Coord Allocator", email="coord-alloc@example.com", role="Coordinator", password_hash="hash")
+        db.session.add(coord)
+        db.session.commit()
+        coord_id = coord.user_id
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = coord_id
 
     # Empty payload
     res1 = client.post("/assignments/allocate", json={})
