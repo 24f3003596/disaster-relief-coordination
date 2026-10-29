@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request, session, render_template
 
 from extensions import db
 from models import Assignment, ReliefRequest, User, Incident
-from auth import login_required
+from auth import login_required, roles_required
 from audit import log_action
 from constants import (
     ROLE_ADMIN,
@@ -220,7 +220,7 @@ def _requests_visible_to(user, status=None, requested_user_id=None):
 
     if user.role == ROLE_VICTIM:
         if requested_user_id is not None and requested_user_id != user.user_id:
-            raise PermissionError("You can only view your own relief requests")
+            return []
         return list_relief_requests(status=status, user_id=user.user_id)
 
     if user.role == ROLE_VOLUNTEER:
@@ -272,6 +272,8 @@ def create_request_route():
         target_user_id = supplied_user_id
 
     try:
+        if current_user.role not in (ROLE_VICTIM, ROLE_COORDINATOR, ROLE_ADMIN):
+            return jsonify({"error": "Insufficient permissions"}), 403
         req = create_relief_request(
             user_id=target_user_id,
             category=data.get("category"),
@@ -317,7 +319,8 @@ def list_requests_route():
     if current_user is None:
         session.clear()
         return jsonify({"error": "Authentication required"}), 401
-
+    if current_user.role not in (ROLE_VICTIM, ROLE_VOLUNTEER, ROLE_COORDINATOR, ROLE_ADMIN):
+        return jsonify({"error": "Insufficient permissions"}), 403
     try:
         requests_list = _requests_visible_to(
             current_user, status=status, requested_user_id=user_id
@@ -350,6 +353,7 @@ def get_request_route(request_id):
 
 @requests_bp.patch("/<int:request_id>/status")
 @login_required
+@roles_required("Coordinator", "Admin")
 def update_request_status_route(request_id):
     current_user = db.session.get(User, session.get("user_id"))
     if current_user is None:
