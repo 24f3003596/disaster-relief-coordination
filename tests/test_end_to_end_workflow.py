@@ -45,7 +45,8 @@ def test_register_request_allocate_complete_and_notify(client, app):
     )
     assert promote_response.status_code == 200
     assert promote_response.json['user']['role'] == 'Volunteer'
-    client.post('/auth/logout')
+    # Keep the authenticated Admin session for the coordinator-style workflow
+    # below. The requests page and creation endpoint require authentication.
 
     # Registered users must be available in the Requester dropdown.
     response = client.get('/requests')
@@ -94,13 +95,40 @@ def test_register_request_allocate_complete_and_notify(client, app):
         assert assignment.status == 'Assigned'
         assert 'assigned request' in notification.message.lower()
 
-    # The notification should be visible in the rendered Notifications page.
+    
+    # Notifications are scoped to the logged-in user.
+    # Log in as the Volunteer who received the notification.
+    client.post('/auth/logout')
+
+    volunteer_login = client.post('/auth/login', json={
+        'email': 'volunteer-flow@example.com',
+        'password': 'testpass123',
+    })
+    assert volunteer_login.status_code == 200
+
+    # Verify the Volunteer can see their assignment notification.
     response = client.get('/notifications')
     assert response.status_code == 200
     assert b'assigned request' in response.data.lower()
 
+    # Log back in as Admin to complete the assignment.
+    client.post('/auth/logout')
+
+    admin_login = client.post('/auth/login', json={
+        'email': 'admin-flow@example.com',
+        'password': 'adminpass123',
+    })
+    assert admin_login.status_code == 200
+
     # Complete the assignment through the status form route.
-    response = client.post(f'/assignments/{task_id}/status', data={'status': 'Completed'}, follow_redirects=True)
+    response = client.post(
+        f'/assignments/{task_id}/status',
+        data={'status': 'Completed'},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b'Assignment status updated' in response.data
+
     assert response.status_code == 200
     assert b'Assignment status updated' in response.data
 
