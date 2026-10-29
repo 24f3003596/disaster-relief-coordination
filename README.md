@@ -1,6 +1,6 @@
 # Disaster Relief Resource Coordination System (Team 20)
 
-**Software Engineering Project — Review 2 Delivery**
+**Software Engineering Project — Sprint 3 (Review 3) Delivery**
 
 An integrated, role-based web application and API for managing disaster incidents, emergency relief requests, warehouse inventory, volunteer dispatching, notifications, and coordinator operations.
 
@@ -75,7 +75,9 @@ disaster-relief-coordination/
     ├── test_dashboard.py       # Dashboard metrics calculation tests
     ├── test_audit.py           # Audit trail integrity tests
     ├── test_integration.py     # Multi-module end-to-end integration tests
-    └── test_end_to_end_workflow.py # Full lifecycle workflow tests
+    ├── test_end_to_end_workflow.py # Full lifecycle workflow tests
+    ├── test_rbac.py                # RBAC enforcement and access-control regression tests
+    └── test_inventory_resource_consistency.py # Inventory and allocation consistency (Sprint 3)
 ```
 
 ---
@@ -162,19 +164,19 @@ Open **`http://127.0.0.1:5000/`** in your browser.
 ```bash
 pytest -v
 ```
-**Result**: 62 passed, 0 failures (100% pass rate) — verified on `main` post Sprint 2 integration, Python 3.14.5, pytest 9.1.1. (Baseline pre-integration: 45 passed; +17 new tests added in Sprint 2). Always re-run after any code or test change to get current figures.
+**Result**: **94 passed, 0 failures (100% pass rate)** — verified on `main` post Sprint 3 integration, Python 3.14.5, pytest 9.1.1. (Baseline pre-Sprint 3: 62 passed; +32 new tests added in Sprint 3). Always re-run after any code or test change to get current figures.
 
 ### Run Test Coverage
 ```bash
 pytest --cov=. --cov-report=term-missing
 ```
-**Coverage**: **~76% statement coverage** across core application modules (~85% including test suite; raw `pytest-cov` total is 46% because the `routes/` and `core/` refactor packages and `build_all_word_documents.py` are counted but not exercised by tests — see [`docs/CODE_COVERAGE_REPORT.md`](docs/CODE_COVERAGE_REPORT.md) for the full breakdown).
+**Coverage**: **~80% statement coverage** across core application modules (raw `pytest-cov` total is 50%; the `routes/` mirror package and `build_all_word_documents.py` inflate the denominator — see [`docs/CODE_COVERAGE_REPORT.md`](docs/CODE_COVERAGE_REPORT.md) for the full breakdown).
 
 ### Run Cyclomatic Complexity Check (Radon)
 ```bash
 radon cc . -s -a
 ```
-**Complexity Rating**: **Grade A (average 4.05)** across 240 analysed functions, methods, and classes.
+**Complexity Rating**: **Grade A (average 4.65)** across 289 analysed functions, methods, and classes.
 
 ---
 
@@ -192,6 +194,12 @@ All team feature branches were developed on dedicated branch tracks and merged i
 5. `upload-sprint2` by **Vishal K V** (PR #3 — merged, TEAM20-53/54: Fix public registration role escalation)
 6. `feature/allocation-testing` by **SIVANESH** (merged, TEAM20-55/56: Expand allocation integration tests + fix dropdown)
 7. `feature/test-documentation` by **Sree Naresh A** (merged, TEAM20-57/58: Quality verification & documentation)
+
+
+**Sprint 3 (Review 3)**
+8. `feature/sprint3-relief-incident-workflow` by **Vishal K V** (PR #4 — merged, TEAM20-59/60: Validate relief requests and incident workflows)
+9. `sprint-3-sivanesh` by **SIVANESH** (merged, TEAM20-61/62: Strengthen RBAC and regression testing)
+10. `feature/sprint3-inventory-consistency` by **Sree Naresh A** (merged, TEAM20-63: Verify inventory and resource allocation consistency)
 
 All authors are credited in the Git commit tree and appear on GitHub's Contributors graph.
 
@@ -217,6 +225,7 @@ All authors are credited in the Git commit tree and appear on GitHub's Contribut
 ### Sprint Breakdown
 - **Sprint 1 (Foundations & Authentication)**: Models schema, Password hashing, Registration, Incidents intake, Inventory core (`TEAM20-16`, `TEAM20-17`, `TEAM20-18`, `TEAM20-19`).
 - **Sprint 2 (Operations, Coordination & Delivery)**: Relief requests intake, Volunteer assignment & atomic stock deduction, Notifications & emergency broadcast, Analytics dashboard, Audit logging, Registration security hardening, Allocation integration tests, Quality verification & documentation (`TEAM20-20` through `TEAM20-28`, `TEAM20-53` through `TEAM20-58`).
+- **Sprint 3 (Quality, Security & Integration)**: Incident workflow validation, Input coordinate checks, RBAC strengthening, Inventory & resource consistency guarantees, Integration & review of all Sprint 3 changes (`TEAM20-59` through `TEAM20-64`).
 
 ### Sprint 2 JIRA Tickets
 | Ticket | Title | Assignee | Status |
@@ -227,6 +236,21 @@ All authors are credited in the Git commit tree and appear on GitHub's Contribut
 | TEAM20-56 | Validate Resource Allocation Failure Handling | SIVANESH | Done |
 | TEAM20-57 | Full Test Suite and Quality Verification | Sree Naresh A | Done |
 | TEAM20-58 | Update Technical Documentation and Review Evidence | Sree Naresh A | Done |
+
+
+### Sprint 3 JIRA Tickets
+| Ticket | Title | Assignee | Story Points | Status |
+|---|---|---|---|---|
+| TEAM20-59 | Validate Relief Request and Incident Workflows | Vishal K V | 5 | Done |
+| TEAM20-60 | Integrate and Review Sprint 3 — Vishal | Vishal K V | 3 | Done |
+| TEAM20-61 | Strengthen RBAC and Regression Testing | SIVANESH | 5 | Done |
+| TEAM20-62 | Integrate and Review Sprint 3 — Sivanesh | SIVANESH | 3 | Done |
+| TEAM20-63 | Verify Inventory and Resource Consistency | Sree Naresh A | 5 | Done |
+| TEAM20-64 | Integrate and Review Sprint 3 Changes | Sree Naresh A | 3 | Done |
+
+### Status for Review 3
+All 6 Sprint 3 tickets are **Done**. All Sprint 3 feature branches merged into `main` via `integration/sprint3-main`. Post-integration test suite: **94 passed, 0 failures (100% pass rate)** (see [`docs/TEST_EXECUTION_REPORT.md`](docs/TEST_EXECUTION_REPORT.md)).
+
 
 ### Status for Review 2
 All 6 Sprint 2 tickets are **Done**. All feature branches merged into `main`. Post-integration test suite: **62 passed, 0 failures (100% pass rate)** (see [`docs/TEST_EXECUTION_REPORT.md`](docs/TEST_EXECUTION_REPORT.md)).

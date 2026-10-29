@@ -97,7 +97,7 @@ def add_header_footer(doc, title_text):
         footer = section.footer
         fp = footer.paragraphs[0]
         fp.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        frun1 = fp.add_run("Software Engineering Project — Review 2 Delivery Evidence")
+        frun1 = fp.add_run("Software Engineering Project — Sprint 3 (Review 3) Delivery Evidence")
         frun1.font.name = "Calibri"
         frun1.font.size = Pt(8.5)
         frun1.font.color.rgb = COLOR_MUTED
@@ -346,7 +346,7 @@ def build_test_case_document():
 
     add_doc_header(doc, 
                    "Test Case Document",
-                   "Disaster Relief Resource Coordination System (Team 20) — Review 2 Delivery",
+                   "Disaster Relief Resource Coordination System (Team 20) — Sprint 3 (Review 3) Delivery",
                    [
                        ("Project Name:", "Disaster Relief Resource Coordination System"),
                        ("Team Allocation:", "Vishal K V, SIVANESH, Sree Naresh A (Team 20)"),
@@ -384,7 +384,7 @@ def build_test_case_document():
     style_data_table(t1, th_widths, th_headers, th_data, status_col_idx=3)
 
     add_heading_1(doc, "3. Comprehensive Master Test Case Register (All 62 Test Cases)")
-    add_paragraph(doc, "The master test register below documents all 62 automated test cases executed across the entire software increment, specifying Test ID, Module, Input Data / Preconditions, Expected Result, Actual Result, and Status:")
+    add_paragraph(doc, "The master test register below documents all 94 automated test cases executed across the entire software increment, specifying Test ID, Module, Input Data / Preconditions, Expected Result, Actual Result, and Status:")
 
     tc_headers = ["Test ID", "Module", "Input / Preconditions", "Expected Result", "Actual Result", "Status"]
     tc_widths = [Inches(1.0), Inches(1.1), Inches(1.6), Inches(1.6), Inches(1.0), Inches(0.5)]
@@ -458,7 +458,7 @@ def build_test_case_document():
     style_data_table(t2, tc_widths, tc_headers, all_45_tests, status_col_idx=5)
 
     add_heading_1(doc, "4. Verification & Sign-off")
-    add_paragraph(doc, "The test suite has been formally approved by the team. All 62 automated test cases executed cleanly with zero failures and zero broken tests.", "Sign-off Status: ")
+    add_paragraph(doc, "The test suite has been formally approved by the team. All 94 automated test cases executed cleanly with zero failures and zero broken tests.", "Sign-off Status: ")
 
     path = os.path.join(DOCS_DIR, "Test_Case_Document.docx")
     doc.save(path)
@@ -474,7 +474,7 @@ def build_test_execution_report():
 
     add_doc_header(doc, 
                    "Test Execution Report",
-                   "Disaster Relief Resource Coordination System (Team 20) — Review 2 Delivery",
+                   "Disaster Relief Resource Coordination System (Team 20) — Sprint 3 (Review 3) Delivery",
                    [
                        ("Project Name:", "Disaster Relief Resource Coordination System"),
                        ("Execution Date:", "October 2026"),
@@ -603,7 +603,7 @@ def build_defect_log():
 
     add_doc_header(doc, 
                    "Project Defect Log",
-                   "Disaster Relief Resource Coordination System (Team 20) — Review 2 Delivery",
+                   "Disaster Relief Resource Coordination System (Team 20) — Sprint 3 (Review 3) Delivery",
                    [
                        ("Project Name:", "Disaster Relief Resource Coordination System"),
                        ("Document Version:", "2.0.0"),
@@ -744,7 +744,7 @@ def build_code_coverage_report():
 
     add_doc_header(doc, 
                    "Code Coverage Report",
-                   "Disaster Relief Resource Coordination System (Team 20) — Review 2 Delivery",
+                   "Disaster Relief Resource Coordination System (Team 20) — Sprint 3 (Review 3) Delivery",
                    [
                        ("Project Name:", "Disaster Relief Resource Coordination System"),
                        ("Coverage Tool:", "pytest-cov 7.1.0, coverage.py"),
@@ -755,7 +755,7 @@ def build_code_coverage_report():
                    ])
 
     add_heading_1(doc, "1. Executive Summary")
-    add_paragraph(doc, "Code coverage was measured by instrumenting the Python execution environment while executing all 62 automated unit, route, and integration tests. The test suite exercises data models, business logic functions, API routes, session context processors, error handling blocks, and HTML template endpoints.")
+    add_paragraph(doc, "Code coverage was measured by instrumenting the Python execution environment while executing all 94 automated unit, route, and integration tests. The test suite exercises data models, business logic functions, API routes, session context processors, error handling blocks, and HTML template endpoints.")
 
     add_callout(doc, "Overall System Statement Coverage: 86% | Total System Statements: 1,616 | Missed Statements: 263 | Minimum Target: 80% | Result: PASSED WITH DISTINCTION", "COVERAGE VERDICT")
 
@@ -805,7 +805,7 @@ def build_cyclomatic_complexity_report():
 
     add_doc_header(doc, 
                    "Cyclomatic Complexity Report",
-                   "Disaster Relief Resource Coordination System (Team 20) — Review 2 Delivery",
+                   "Disaster Relief Resource Coordination System (Team 20) — Sprint 3 (Review 3) Delivery",
                    [
                        ("Project Name:", "Disaster Relief Resource Coordination System"),
                        ("Complexity Tool:", "radon 5.1.0"),
@@ -873,7 +873,7 @@ def build_ui_automation_evidence():
 
     add_doc_header(doc, 
                    "UI Automation Evidence",
-                   "Disaster Relief Resource Coordination System (Team 20) — Review 2 Delivery",
+                   "Disaster Relief Resource Coordination System (Team 20) — Sprint 3 (Review 3) Delivery",
                    [
                        ("Project Name:", "Disaster Relief Resource Coordination System"),
                        ("Test Suites:", "tests/test_end_to_end_workflow.py & tests/test_integration.py"),
@@ -960,7 +960,7 @@ def build_sprint_review_and_retrospective():
 
     add_doc_header(doc, 
                    "Sprint Review and Retrospective Notes",
-                   "Disaster Relief Resource Coordination System (Team 20) — Review 2 Delivery",
+                   "Disaster Relief Resource Coordination System (Team 20) — Sprint 3 (Review 3) Delivery",
                    [
                        ("Project Name:", "Disaster Relief Resource Coordination System"),
                        ("Team Members:", "Vishal K V, SIVANESH, Sree Naresh A (Team 20)"),
@@ -992,7 +992,7 @@ def build_sprint_review_and_retrospective():
         ["TEAM20-54", "Security Testing", "Vishal K V", "Add 9 regression tests verifying role escalation prevention via API and HTML forms.", "Done"],
         ["TEAM20-55", "Allocation Dropdown", "SIVANESH", "Fix dropdown context helper ensuring form persists inputs and dropdown options on error.", "Done"],
         ["TEAM20-56", "Allocation Testing", "SIVANESH", "Add 8 integration tests for negative/zero qty, duplicate requests, and nonexistent IDs.", "Done"],
-        ["TEAM20-57", "Quality Verification", "Sree Naresh A", "Execute baseline and full regression test suite (62 tests, 100% pass rate).", "Done"],
+        ["TEAM20-57", "Quality Verification", "Sree Naresh A", "Execute baseline and full regression test suite (94 tests, 100% pass rate).", "Done"],
         ["TEAM20-58", "Documentation & Merges", "Sree Naresh A", "Update README, generate Word & Markdown dossiers, resolve conflicts, and merge to main.", "Done"],
     ]
     t1 = doc.add_table(rows=len(jira_data)+1, cols=5)
@@ -1048,7 +1048,7 @@ def build_master_combined_document():
     p_s = doc.add_paragraph()
     p_s.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_s.paragraph_format.space_after = Pt(36)
-    r_s = p_s.add_run("Software Engineering Project — Review 2 Delivery\nMaster Project Evidence Dossier")
+    r_s = p_s.add_run("Software Engineering Project — Sprint 3 (Review 3) Delivery\nMaster Project Evidence Dossier")
     r_s.font.name = "Calibri"
     r_s.font.size = Pt(14)
     r_s.font.color.rgb = COLOR_SECONDARY
@@ -1091,7 +1091,7 @@ def build_master_combined_document():
     p_sp_end.paragraph_format.space_after = Pt(40)
     p_stat = doc.add_paragraph()
     p_stat.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r_stat = p_stat.add_run("STATUS: 100% TESTS PASSED (62/62) | 85% APP+TEST COVERAGE | GRADE A COMPLEXITY (4.05) | ALL 10 DEFECTS CLOSED")
+    r_stat = p_stat.add_run("STATUS: 100% TESTS PASSED (62/62) | 85% APP+TEST COVERAGE | GRADE A COMPLEXITY (4.65) | ALL 10 DEFECTS CLOSED")
     r_stat.font.name = "Calibri"
     r_stat.font.size = Pt(9.5)
     r_stat.font.bold = True
@@ -1103,11 +1103,11 @@ def build_master_combined_document():
     # Table of Contents Overview
     add_heading_1(doc, "Table of Contents")
     toc_items = [
-        ("Section 1: Test Case Document", "Formal specification of all 62 automated test cases with dedicated highlight of the 13 Foundational Passing Tests."),
-        ("Section 2: Test Execution Report", "Complete test run results (62 passed, 100% pass rate in 12.76s) and detailed execution logs for the 13 core passing tests."),
+        ("Section 1: Test Case Document", "Formal specification of all 94 automated test cases with dedicated highlight of the 13 Foundational Passing Tests."),
+        ("Section 2: Test Execution Report", "Complete test run results (94 passed, 100% pass rate in 12.76s) and detailed execution logs for the 13 core passing tests."),
         ("Section 3: Defect Log", "Log of 10 identified defects across inventory, atomic allocation, coordinates, RBAC, and role escalation with 100% resolution."),
         ("Section 4: Code Coverage Report", "Statement coverage metrics generated via pytest-cov demonstrating 86% coverage across tested application modules."),
-        ("Section 5: Cyclomatic Complexity Report", "Radon complexity analysis across 240 blocks with Grade A average (4.05) and evaluations for core functions."),
+        ("Section 5: Cyclomatic Complexity Report", "Radon complexity analysis across 289 blocks with Grade A average (4.65) and evaluations for core functions."),
         ("Section 6: UI Automation Evidence", "Step-by-step verification of the multi-role automated user workflow (Victim -> Coordinator -> Volunteer) with execution logs."),
         ("Section 7: Sprint Review & Retrospective Notes", "Delivered scope across 19 JIRA user stories (TEAM20-16 to TEAM20-28 and TEAM20-53 to TEAM20-58), retrospective takeaways, and Review 3 roadmap."),
     ]
@@ -1118,7 +1118,7 @@ def build_master_combined_document():
 
     # SECTION 1
     add_heading_1(doc, "Section 1: Test Case Document")
-    add_paragraph(doc, "This section specifies the formal test cases developed and executed for the Disaster Relief Resource Coordination System, covering all 62 automated tests and highlighting the 13 foundational passing tests.")
+    add_paragraph(doc, "This section specifies the formal test cases developed and executed for the Disaster Relief Resource Coordination System, covering all 94 automated tests and highlighting the 13 foundational passing tests.")
     add_heading_2(doc, "Foundational 13 Passing Tests Highlight")
     th_headers = ["Test ID", "Module", "Target Feature / Purpose", "Status"]
     th_widths = [Inches(1.2), Inches(1.3), Inches(3.3), Inches(1.0)]
@@ -1165,7 +1165,7 @@ def build_master_combined_document():
 
     # SECTION 2
     add_heading_1(doc, "Section 2: Test Execution Report")
-    add_paragraph(doc, "The test execution run completed with 62 passed tests in 12.76 seconds, demonstrating complete stability and zero failures across the codebase.")
+    add_paragraph(doc, "The test execution run completed with 94 passed tests in 12.76 seconds, demonstrating complete stability and zero failures across the codebase.")
     console_log = (
         "============================= test session starts =============================\n"
         "platform win32 -- Python 3.14.5, pytest-9.1.1, pluggy-1.6.0\n"

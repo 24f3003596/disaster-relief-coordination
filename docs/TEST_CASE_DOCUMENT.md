@@ -1,81 +1,214 @@
-# Test Case Document — Review 2 Delivery
-**Project**: Disaster Relief Resource Coordination System (Team 20)  
-**Team Members**: Vishal K V, SIVANESH, Sree Naresh A  
-**QA & Documentation Lead**: Sree Naresh A (TEAM20-57, TEAM20-58)  
-**Execution Environment**: Python 3.14.5, pytest 9.1.1, SQLite In-Memory  
-**Status**: **62 Test Cases Executed — 62 Passed (100% Pass Rate)**
+# Test Case Document — Sprint 3 (Review 3)
+
+**Project**: Disaster Relief Resource Coordination System (Team 20)
+**Branch**: `main` (post Sprint 3 integration)
+**Date**: 2026-10-29
+**Total Test Cases**: 94
 
 ---
 
-## 1. Executive Summary
+## TC-001 to TC-010 — Assignment Module (`test_assignments.py`)
 
-This formal Test Case Document specifies all automated regression test cases for the Disaster Relief Resource Coordination System for the Sprint 2 (Review 2) milestone. The test suite covers security, transactional integrity, boundary validations, role-based access control, resource allocation, and user interface workflows.
+| ID | Test Name | Input | Expected | Status |
+|---|---|---|---|---|
+| TC-001 | `test_allocate_updates_stock_request_and_notification` | Valid request, volunteer, item | Stock decremented; request → Assigned; notification created | ✅ PASS |
+| TC-002 | `test_allocation_rejects_insufficient_stock_without_changes` | quantity > available stock | 400 / ValueError; stock unchanged | ✅ PASS |
+| TC-003 | `test_complete_assignment_marks_request_fulfilled` | Complete valid assignment | Status → Completed; request → Fulfilled | ✅ PASS |
+| TC-004 | `test_non_volunteer_cannot_be_assigned` | Victim user as volunteer_id | ValueError raised | ✅ PASS |
+| TC-005 | `test_allocation_rejects_nonexistent_request` | Invalid request_id | ValueError raised | ✅ PASS |
+| TC-006 | `test_allocation_rejects_nonexistent_inventory` | Invalid item_id | ValueError raised | ✅ PASS |
+| TC-007 | `test_invalid_allocation_quantity_changes_nothing[0]` | quantity_assigned=0 | ValueError raised; no side effects | ✅ PASS |
+| TC-008 | `test_invalid_allocation_quantity_changes_nothing[-1]` | quantity_assigned=-1 | ValueError raised; no side effects | ✅ PASS |
+| TC-009 | `test_invalid_allocation_quantity_changes_nothing[invalid]` | quantity_assigned="invalid" | ValueError raised; no side effects | ✅ PASS |
+| TC-010 | `test_allocation_rejects_duplicate_request` | Active assignment exists | ValueError "already has an assignment" | ✅ PASS |
 
 ---
 
-## 2. Master Test Case Register (All 62 Tests)
+## TC-011 to TC-013 — Audit Trail (`test_audit.py`)
 
-| Test ID | Module | Test Function Name | Focus / Precondition | Expected Result | Status |
-|---|---|---|---|---|---|
-| **TC-ASN-01** | Allocation | `test_allocate_updates_stock_request_and_notification` | Allocate 5 units of stock to volunteer | Stock decremented, request Assigned, volunteer notified | **PASSED** |
-| **TC-ASN-02** | Allocation | `test_allocation_rejects_insufficient_stock_without_changes` | Request qty exceeds available inventory | Transaction rolls back, stock intact, status unchanged | **PASSED** |
-| **TC-ASN-03** | Allocation | `test_complete_assignment_marks_request_fulfilled` | Volunteer completes assigned task | Assignment Completed, ReliefRequest Fulfilled | **PASSED** |
-| **TC-ASN-04** | Allocation | `test_non_volunteer_cannot_be_assigned` | Attempt assigning task to Victim | HTTP 400 / ValueError rejected | **PASSED** |
-| **TC-ASN-05** | Allocation | `test_allocation_rejects_nonexistent_request` | Nonexistent `request_id=9999` | Handled gracefully, returns error, stock unaffected | **PASSED** |
-| **TC-ASN-06** | Allocation | `test_allocation_rejects_nonexistent_inventory` | Nonexistent `inventory_item_id=9999` | Handled gracefully, returns error | **PASSED** |
-| **TC-ASN-07** | Allocation | `test_invalid_allocation_quantity_changes_nothing[0]` | Zero allocation quantity (`0`) | Rejected, stock intact | **PASSED** |
-| **TC-ASN-08** | Allocation | `test_invalid_allocation_quantity_changes_nothing[-1]` | Negative allocation quantity (`-1`) | Rejected, stock intact | **PASSED** |
-| **TC-ASN-09** | Allocation | `test_invalid_allocation_quantity_changes_nothing[invalid]` | Non-numeric string quantity (`"invalid"`) | Handled cleanly, rejected | **PASSED** |
-| **TC-ASN-10** | Allocation | `test_allocation_rejects_duplicate_request` | Allocate request already Assigned | Duplicate allocation blocked | **PASSED** |
-| **TC-AUD-01** | Audit | `test_log_action_and_listing` | Coordinator triggers audited event | AuditLog created with user, action, timestamp | **PASSED** |
-| **TC-AUD-02** | Audit | `test_log_action_requires_action` | Action name missing | ValueError raised | **PASSED** |
-| **TC-AUD-03** | Audit | `test_audit_routes_require_authorization` | Non-admin accesses `/audit/` | HTTP 403 Forbidden | **PASSED** |
-| **TC-AUT-01** | Auth | `test_register_success` | Valid email and password registration | HTTP 201 Created, user persisted | **PASSED** |
-| **TC-AUT-02** | Auth | `test_api_registration_cannot_choose_role[Admin]` | Malicious JSON POST `{"role": "Admin"}` | Role forced to `Victim`; privilege escalation blocked | **PASSED** |
-| **TC-AUT-03** | Auth | `test_api_registration_cannot_choose_role[Coordinator]` | Malicious JSON POST `{"role": "Coordinator"}` | Role forced to `Victim`; escalation blocked | **PASSED** |
-| **TC-AUT-04** | Auth | `test_api_registration_cannot_choose_role[Volunteer]` | Malicious JSON POST `{"role": "Volunteer"}` | Role forced to `Victim`; escalation blocked | **PASSED** |
-| **TC-AUT-05** | Auth | `test_api_registration_cannot_choose_role[UnexpectedRole]` | Malicious JSON POST `{"role": "SuperUser"}` | Role forced to `Victim`; escalation blocked | **PASSED** |
-| **TC-AUT-06** | Auth | `test_api_registration_cannot_choose_role[Victim]` | Legitimate JSON POST `{"role": "Victim"}` | Registered with role `Victim` | **PASSED** |
-| **TC-AUT-07** | Auth | `test_html_registration_cannot_choose_role[Admin]` | Form POST with tampered field `role=Admin` | Registered user has role `Victim` | **PASSED** |
-| **TC-AUT-08** | Auth | `test_html_registration_cannot_choose_role[Coordinator]` | Form POST with tampered field `role=Coordinator` | Registered user has role `Victim` | **PASSED** |
-| **TC-AUT-09** | Auth | `test_html_registration_cannot_choose_role[Volunteer]` | Form POST with tampered field `role=Volunteer` | Registered user has role `Victim` | **PASSED** |
-| **TC-AUT-10** | Auth | `test_registration_page_does_not_offer_role_selector` | GET `/register` page response | Role dropdown is absent; message informs Victim role | **PASSED** |
-| **TC-AUT-11** | Auth | `test_register_duplicate_email` | Register existing email address | HTTP 400 Bad Request | **PASSED** |
-| **TC-AUT-12** | Auth | `test_register_short_password` | Register with password `< 6` characters | HTTP 400 Bad Request | **PASSED** |
-| **TC-AUT-13** | Auth | `test_login_success_and_wrong_password` | Valid vs wrong password login | HTTP 200 on valid; HTTP 401 on wrong | **PASSED** |
-| **TC-AUT-14** | Auth | `test_password_is_hashed` | Inspect `User.password_hash` column | PBKDF2 hash stored; raw password never saved | **PASSED** |
-| **TC-AUT-15** | Auth | `test_role_update_requires_authorization` | Unauthorized user calls role update endpoint | HTTP 401/403 returned | **PASSED** |
-| **TC-AUT-16** | Auth | `test_admin_can_assign_role_through_protected_endpoint` | Admin promotes Victim to Volunteer | Role updated to Volunteer successfully | **PASSED** |
-| **TC-DSH-01** | Dashboard | `test_dashboard_summary_metrics` | Aggregate requests, inventory, incidents | Accurate metric counts returned | **PASSED** |
-| **TC-DSH-02** | Dashboard | `test_dashboard_routes` | Authorized Coordinator GET `/dashboard/` | HTTP 200 OK with summary KPIs | **PASSED** |
-| **TC-E2E-01** | E2E | `test_register_request_allocate_complete_and_notify` | Complete browser workflow across roles | Full multi-role lifecycle verified | **PASSED** |
-| **TC-INC-01** | Incidents | `test_create_incident_success` | Coordinator creates incident with coordinates | HTTP 201 Created | **PASSED** |
-| **TC-INC-02** | Incidents | `test_incident_rejects_invalid_latitude` | Latitude `> 90` degrees | HTTP 400 Bad Request | **PASSED** |
-| **TC-INC-03** | Incidents | `test_incident_requires_login` | Unauthenticated POST `/incidents/` | HTTP 401 Unauthorized | **PASSED** |
-| **TC-INC-04** | Incidents | `test_list_affected_areas` | List active geographic incident zones | HTTP 200 OK with area summaries | **PASSED** |
-| **TC-INT-01** | Integration | `test_main_pages_load` | HTTP GET across 11 application routes | All return HTTP 200/302 as expected | **PASSED** |
-| **TC-INT-02** | Integration | `test_end_to_end_relief_workflow` | Multi-step request, stock deduction, dispatch | End-to-end integration confirmed | **PASSED** |
-| **TC-INT-03** | Integration | `test_allocation_insufficient_stock_fails_atomically` | Atomicity test on allocation failure | Zero stock leakage, DB rolls back | **PASSED** |
-| **TC-INT-04** | Integration | `test_automated_workflow_via_http_client` | Test client simulating real user actions | Complete HTTP session workflow passes | **PASSED** |
-| **TC-INV-01** | Inventory | `test_create_inventory_item_success` | Create stock item with valid category & qty | HTTP 201 Created | **PASSED** |
-| **TC-INV-02** | Inventory | `test_create_inventory_rejects_negative_quantity` | Quantity `< 0` | ValueError raised | **PASSED** |
-| **TC-INV-03** | Inventory | `test_create_inventory_rejects_invalid_category` | Category outside allowed constants | ValueError raised | **PASSED** |
-| **TC-INV-04** | Inventory | `test_create_inventory_rejects_negative_threshold` | Threshold `< 0` | ValueError raised | **PASSED** |
-| **TC-INV-05** | Inventory | `test_boundary_threshold_low_stock` | Boundary testing at threshold (50 vs 51) | Low-stock flag evaluated correctly | **PASSED** |
-| **TC-INV-06** | Inventory | `test_update_inventory_stock` | Restock and deduction adjustments | Accurate stock levels maintained | **PASSED** |
-| **TC-INV-07** | Inventory | `test_inventory_routes_and_access` | Coordinator access vs unauthenticated access | Protected by authentication | **PASSED** |
-| **TC-NOT-01** | Notifications | `test_mark_read_only_for_owner` | User attempts reading another user's alert | Unauthorized access blocked | **PASSED** |
-| **TC-NOT-02** | Notifications | `test_broadcast_targets_operational_roles` | Emergency alert broadcast | Dispatched to Coordinators and Volunteers | **PASSED** |
-| **TC-REP-01** | Reports | `test_summary_report_requires_login` | Unauthenticated GET `/reports/summary` | HTTP 401 Unauthorized | **PASSED** |
-| **TC-REP-02** | Reports | `test_summary_report_forbidden_for_victim` | Victim role accesses `/reports/summary` | HTTP 403 Forbidden | **PASSED** |
-| **TC-REP-03** | Reports | `test_summary_report_returns_counts` | Summary report aggregations | Accurate request and stock counts | **PASSED** |
-| **TC-REP-04** | Reports | `test_relief_request_report_filters_by_status` | Filter requests by status (Pending, Assigned) | Correct filtered subsets returned | **PASSED** |
-| **TC-REQ-01** | Requests | `test_create_relief_request_success` | Victim submits relief request | HTTP 201 Created with Pending status | **PASSED** |
-| **TC-REQ-02** | Requests | `test_create_request_rejects_zero_or_negative_quantity` | Quantity `<= 0` | ValueError / HTTP 400 rejected | **PASSED** |
-| **TC-REQ-03** | Requests | `test_create_request_rejects_invalid_coordinates` | Latitude/Longitude outside [-90,90],[-180,180] | Rejected with validation error | **PASSED** |
-| **TC-REQ-04** | Requests | `test_update_request_status` | Status transition (Pending -> Assigned -> Fulfilled) | Valid transitions allowed | **PASSED** |
-| **TC-REQ-05** | Requests | `test_relief_request_routes` | HTTP endpoints for requests | Correct HTTP status codes returned | **PASSED** |
-| **TC-VOL-01** | Volunteers | `test_list_volunteers_returns_only_volunteer_role` | Query volunteer directory | Only users with role `Volunteer` returned | **PASSED** |
-| **TC-VOL-02** | Volunteers | `test_get_volunteer_assignments_returns_assigned_tasks` | Query assigned tasks for volunteer | Accurate list of assignments returned | **PASSED** |
-| **TC-VOL-03** | Volunteers | `test_get_volunteer_assignments_rejects_non_volunteer` | Query assignments for Victim user | Rejected with error | **PASSED** |
-| **TC-VOL-04** | Volunteers | `test_get_volunteer_assignments_rejects_unknown_user` | Query assignments for nonexistent user | Handled gracefully with error | **PASSED** |
+| ID | Test Name | Input | Expected | Status |
+|---|---|---|---|---|
+| TC-011 | `test_log_action_and_listing` | `log_action(action="LOGIN", ...)` | AuditLog row created; listing returns it | ✅ PASS |
+| TC-012 | `test_log_action_requires_action` | `log_action()` without action | ValueError raised | ✅ PASS |
+| TC-013 | `test_audit_routes_require_authorization` | Unauthenticated GET /audit/ | 401 / redirect | ✅ PASS |
+
+---
+
+## TC-014 to TC-030 — Authentication (`test_auth.py`)
+
+| ID | Test Name | Input | Expected | Status |
+|---|---|---|---|---|
+| TC-014 | `test_register_success` | Valid name/email/password | 201 / user created as Victim | ✅ PASS |
+| TC-015–019 | `test_api_registration_cannot_choose_role[*]` | role=Admin/Coordinator/Volunteer/etc. via JSON | Role ignored; user created as Victim | ✅ PASS |
+| TC-020–022 | `test_html_registration_cannot_choose_role[*]` | role= via form | Role ignored; user created as Victim | ✅ PASS |
+| TC-023 | `test_registration_page_does_not_offer_role_selector` | GET /register | Response HTML has no role `<select>` element | ✅ PASS |
+| TC-024 | `test_register_duplicate_email` | Existing email | 409 Conflict | ✅ PASS |
+| TC-025 | `test_register_short_password` | password < 8 chars | 400 Bad Request | ✅ PASS |
+| TC-026 | `test_login_success_and_wrong_password` | Correct / wrong password | 200 success; 401 failure | ✅ PASS |
+| TC-027 | `test_password_is_hashed` | Register then read DB | `password_hash` != raw password | ✅ PASS |
+| TC-028 | `test_role_update_requires_authorization` | Non-Admin PATCH /auth/users/1/role | 401 or 403 | ✅ PASS |
+| TC-029 | `test_admin_can_assign_role_through_protected_endpoint` | Admin PATCH /auth/users/1/role | Role updated; 200 | ✅ PASS |
+
+---
+
+## TC-030 to TC-031 — Dashboard (`test_dashboard.py`)
+
+| ID | Test Name | Input | Expected | Status |
+|---|---|---|---|---|
+| TC-030 | `test_dashboard_summary_metrics` | Coordinator session + seeded data | Counts match DB state | ✅ PASS |
+| TC-031 | `test_dashboard_routes` | GET /dashboard/ as Coordinator | 200 OK | ✅ PASS |
+
+---
+
+## TC-032 — End-to-End Workflow (`test_end_to_end_workflow.py`)
+
+| ID | Test Name | Input | Expected | Status |
+|---|---|---|---|---|
+| TC-032 | `test_register_request_allocate_complete_and_notify` | Full lifecycle: register → request → allocate → complete | Request Fulfilled; notification delivered | ✅ PASS |
+
+---
+
+## TC-033 to TC-040 — Incidents (`test_incidents.py`)
+
+| ID | Test Name | Input | Expected | Status |
+|---|---|---|---|---|
+| TC-033 | `test_create_incident_success` | Valid incident payload | 201; incident in DB | ✅ PASS |
+| TC-034 | `test_incident_rejects_invalid_latitude` | latitude=200 | 400 Bad Request | ✅ PASS |
+| TC-035 | `test_incident_requires_login` | POST /incidents/ unauthenticated | 401 | ✅ PASS |
+| TC-036 | `test_list_affected_areas` | GET /incidents/affected-areas | 200; list of areas | ✅ PASS |
+| TC-037 | `test_incident_can_be_viewed_edited_and_transitioned` | PATCH /incidents/1 + status transition | Data updated; status advanced | ✅ PASS |
+| TC-038 | `test_incident_edit_rejects_invalid_data` | Invalid severity | 400 | ✅ PASS |
+| TC-039 | `test_incident_mutations_require_coordinator_or_admin` | Victim POST /incidents/ | 403 | ✅ PASS |
+| TC-040 | `test_incident_rejects_non_object_payload` | POST /incidents/ with list body | 400 | ✅ PASS |
+
+---
+
+## TC-041 to TC-044 — Integration (`test_integration.py`)
+
+| ID | Test Name | Input | Expected | Status |
+|---|---|---|---|---|
+| TC-041 | `test_main_pages_load` | GET /, /login, /register | 200 OK for all | ✅ PASS |
+| TC-042 | `test_end_to_end_relief_workflow` | Full DB-level workflow | All state transitions correct | ✅ PASS |
+| TC-043 | `test_allocation_insufficient_stock_fails_atomically` | Stock < requested | No partial state; ValueError | ✅ PASS |
+| TC-044 | `test_automated_workflow_via_http_client` | HTTP client full workflow | 201/200 responses; DB consistent | ✅ PASS |
+
+---
+
+## TC-045 to TC-051 — Inventory (`test_inventory.py`)
+
+| ID | Test Name | Input | Expected | Status |
+|---|---|---|---|---|
+| TC-045 | `test_create_inventory_item_success` | Valid item payload | 201; item in DB | ✅ PASS |
+| TC-046 | `test_create_inventory_rejects_negative_quantity` | quantity=-1 | 400 | ✅ PASS |
+| TC-047 | `test_create_inventory_rejects_invalid_category` | category="Invalid" | 400 | ✅ PASS |
+| TC-048 | `test_create_inventory_rejects_negative_threshold` | low_stock_threshold=-1 | 400 | ✅ PASS |
+| TC-049 | `test_boundary_threshold_low_stock` | quantity = threshold | Low-stock flag set | ✅ PASS |
+| TC-050 | `test_update_inventory_stock` | PATCH /inventory/1 | quantity updated | ✅ PASS |
+| TC-051 | `test_inventory_routes_and_access` | Victim GET /inventory/ | 403 Forbidden | ✅ PASS |
+
+---
+
+## TC-052 to TC-064 — Inventory & Resource Consistency (`test_inventory_resource_consistency.py`)
+
+| ID | Test Name | AC | Status |
+|---|---|---|---|
+| TC-052 | `test_successful_allocation_updates_all_records_atomically` | AC1 | ✅ PASS |
+| TC-053 | `test_allocation_rejects_category_mismatch_without_data_corruption` | AC2 | ✅ PASS |
+| TC-054 | `test_allocation_rejects_quantity_exceeding_requested_amount` | AC2 | ✅ PASS |
+| TC-055 | `test_failed_field_delivery_restores_inventory_and_resets_request` | AC2 | ✅ PASS |
+| TC-056 | `test_cancelled_assignment_restores_inventory_and_resets_request` | AC2 | ✅ PASS |
+| TC-057 | `test_reallocation_succeeds_after_previous_assignment_failed` | AC3 | ✅ PASS |
+| TC-058 | `test_insufficient_stock_exact_boundary_conditions` | AC3 | ✅ PASS |
+| TC-059 | `test_repeated_allocation_call_does_not_duplicate_or_leak_stock` | AC4 | ✅ PASS |
+| TC-060 | `test_terminal_assignment_status_cannot_be_mutated` | AC4 | ✅ PASS |
+| TC-061 | `test_repeated_status_update_is_idempotent` | AC4 | ✅ PASS |
+| TC-062 | `test_repeated_failed_assignment_does_not_double_refund_stock` | AC4 | ✅ PASS |
+| TC-063 | `test_mathematical_stock_consistency_across_multiple_allocations` | AC5 | ✅ PASS |
+| TC-064 | `test_allocate_route_missing_parameters_returns_400_without_state_change` | AC5/AC6 | ✅ PASS |
+
+---
+
+## TC-065 to TC-066 — Notifications (`test_notifications.py`)
+
+| ID | Test Name | Input | Expected | Status |
+|---|---|---|---|---|
+| TC-065 | `test_mark_read_only_for_owner` | Other user tries to mark notification | 403 | ✅ PASS |
+| TC-066 | `test_broadcast_targets_operational_roles` | Coordinator broadcast | Only Coordinators/Volunteers receive | ✅ PASS |
+
+---
+
+## TC-067 to TC-075 — RBAC (`test_rbac.py`)
+
+| ID | Test Name | Boundary | Status |
+|---|---|---|---|
+| TC-067 | `test_inventory_write_requires_authentication` | Unauthenticated POST /inventory/ | 401 | ✅ PASS |
+| TC-068 | `test_non_coordinator_cannot_create_inventory[Victim]` | Victim POST /inventory/ | 403 | ✅ PASS |
+| TC-069 | `test_non_coordinator_cannot_create_inventory[Volunteer]` | Volunteer POST /inventory/ | 403 | ✅ PASS |
+| TC-070 | `test_victim_cannot_allocate_resources` | Victim POST /assignments/allocate | 403 | ✅ PASS |
+| TC-071 | `test_victim_cannot_update_request_status` | Victim PATCH /requests/1/status | 403 | ✅ PASS |
+| TC-072 | `test_victim_cannot_read_another_victims_request` | Victim GET /requests/2 | 403 | ✅ PASS |
+| TC-073 | `test_victim_cannot_spoof_request_owner` | Victim POST /requests/ with forged user_id | user_id set from session | ✅ PASS |
+| TC-074 | `test_victim_cannot_see_other_users_requests_by_filter` | Victim GET /requests/?user_id=other | Returns 0 results | ✅ PASS |
+| TC-075 | `test_volunteer_cannot_update_another_volunteers_assignment` | Volunteer PATCH /assignments/other/status | 403 | ✅ PASS |
+
+---
+
+## TC-076 to TC-079 — Reports (`test_reports.py`)
+
+| ID | Test Name | Input | Expected | Status |
+|---|---|---|---|---|
+| TC-076 | `test_summary_report_requires_login` | Unauthenticated GET /reports/ | 401 | ✅ PASS |
+| TC-077 | `test_summary_report_forbidden_for_victim` | Victim GET /reports/ | 403 | ✅ PASS |
+| TC-078 | `test_summary_report_returns_counts` | Coordinator GET /reports/ | Counts match DB | ✅ PASS |
+| TC-079 | `test_relief_request_report_filters_by_status` | GET /reports/requests?status=Pending | Only Pending requests returned | ✅ PASS |
+
+---
+
+## TC-080 to TC-090 — Relief Requests (`test_requests.py`)
+
+| ID | Test Name | Input | Expected | Status |
+|---|---|---|---|---|
+| TC-080 | `test_create_relief_request_success` | Valid request payload | 201; request in DB | ✅ PASS |
+| TC-081 | `test_create_request_rejects_zero_or_negative_quantity` | quantity=0 / -1 | 400 | ✅ PASS |
+| TC-082 | `test_create_request_rejects_invalid_coordinates` | latitude=200 | 400 | ✅ PASS |
+| TC-083 | `test_update_request_status` | Coordinator PATCH status | 200; status updated | ✅ PASS |
+| TC-084 | `test_relief_request_routes` | GET /requests/ as Coordinator | 200; list returned | ✅ PASS |
+| TC-085 | `test_request_status_transition_rejects_skipping_workflow` | Skip Pending→Fulfilled | 400 | ✅ PASS |
+| TC-086 | `test_request_creation_requires_login` | Unauthenticated POST /requests/ | 401 | ✅ PASS |
+| TC-087 | `test_request_creation_ignores_forged_user_id` | POST with user_id=other | user_id from session | ✅ PASS |
+| TC-088 | `test_victim_only_sees_own_requests_and_cannot_change_status` | Victim sees only own; tries PATCH | Own requests; 403 on PATCH | ✅ PASS |
+| TC-089 | `test_incomplete_coordinate_pair_is_rejected` | latitude only, no longitude | 400 | ✅ PASS |
+| TC-090 | `test_invalid_http_request_payload_returns_client_error` | Non-JSON body | 400 | ✅ PASS |
+
+---
+
+## TC-091 to TC-094 — Volunteers (`test_volunteers.py`)
+
+| ID | Test Name | Input | Expected | Status |
+|---|---|---|---|---|
+| TC-091 | `test_list_volunteers_returns_only_volunteer_role` | GET /volunteers/ | Only Volunteer-role users | ✅ PASS |
+| TC-092 | `test_get_volunteer_assignments_returns_assigned_tasks` | GET /volunteers/1/assignments | Tasks for that volunteer | ✅ PASS |
+| TC-093 | `test_get_volunteer_assignments_rejects_non_volunteer` | GET /volunteers/1/assignments for non-Volunteer user_id | 400 | ✅ PASS |
+| TC-094 | `test_get_volunteer_assignments_rejects_unknown_user` | GET /volunteers/999/assignments | 404 | ✅ PASS |
+
+---
+
+## Summary
+
+| Module | Tests | Pass |
+|---|---|---|
+| Assignments | 10 | 10 |
+| Audit | 3 | 3 |
+| Auth | 16 | 16 |
+| Dashboard | 2 | 2 |
+| End-to-End | 1 | 1 |
+| Incidents | 8 | 8 |
+| Integration | 4 | 4 |
+| Inventory | 7 | 7 |
+| Inventory Consistency (Sprint 3) | 13 | 13 |
+| Notifications | 2 | 2 |
+| RBAC (Sprint 3) | 9 | 9 |
+| Reports | 4 | 4 |
+| Requests | 11 | 11 |
+| Volunteers | 4 | 4 |
+| **TOTAL** | **94** | **94** |
