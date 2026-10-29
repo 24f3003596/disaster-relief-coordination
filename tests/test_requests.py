@@ -151,3 +151,113 @@ def test_relief_request_routes(app, client):
     patch_res = client.patch(f"/requests/{req_id}/status", json={"status": "Allocated"})
     assert patch_res.status_code == 200
     assert patch_res.json["request"]["status"] == "Allocated"
+
+
+def test_request_status_transition_rejects_skipping_workflow(app):
+    victim_id = create_victim_user(app)
+    with app.app_context():
+        req = create_relief_request(
+            user_id=victim_id,
+            category=CATEGORY_FOOD_WATER,
+            quantity=2,
+            urgency=URGENCY_HIGH,
+        )
+        with pytest.raises(ValueError, match="Invalid request status transition"):
+            update_request_status(req.request_id, STATUS_REQUEST_COMPLETED)
+        db.session.refresh(req)
+        assert req.status == STATUS_REQUEST_PENDING
+
+
+def test_request_creation_requires_login(client):
+    response = client.post("/requests/", json={
+        "category": CATEGORY_FOOD_WATER,
+        "quantity": 2,
+        "urgency": URGENCY_HIGH,
+    })
+    assert response.status_code == 401
+
+
+def test_request_creation_ignores_forged_user_id(app, client):
+    victim_id = create_victim_user(app)
+    with app.app_context():
+        other = User(
+            name="Other Victim",
+            email="other-victim@example.com",
+            role=ROLE_VICTIM,
+            password_hash=generate_password_hash("safe-pass-123"),
+        )
+        db.session.add(other)
+        db.session.commit()
+        other_id = other.user_id
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = victim_id
+    response = client.post("/requests/", json={
+        "user_id": other_id,
+        "category": CATEGORY_FOOD_WATER,
+        "quantity": 2,
+        "urgency": URGENCY_HIGH,
+    })
+    assert response.status_code == 201
+    assert response.json["request"]["user_id"] == victim_id
+    assert response.json["request"]["user_id"] != other_id
+
+
+def test_victim_only_sees_own_requests_and_cannot_change_status(app, client):
+    first_victim_id = create_victim_user(app)
+    with app.app_context():
+        second_victim = User(
+            name="Second Victim",
+            email="second-victim@example.com",
+            role=ROLE_VICTIM,
+            password_hash=generate_password_hash("safe-pass-123"),
+        )
+        db.session.add(second_victim)
+        db.session.commit()
+        second_victim_id = second_victim.user_id
+        other_request = create_relief_request(
+            user_id=second_victim_id,
+            category=CATEGORY_FOOD_WATER,
+            quantity=3,
+            urgency=URGENCY_HIGH,
+        )
+        other_request_id = other_request.request_id
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = first_victim_id
+    response = client.get("/requests/", headers={"Accept": "application/json"})
+    assert response.status_code == 200
+    assert all(item["user_id"] == first_victim_id for item in response.json["requests"])
+    hidden_request = client.get(f"/requests/{other_request_id}")
+    assert hidden_request.status_code == 403
+    status_response = client.patch(
+        f"/requests/{other_request_id}/status", json={"status": STATUS_REQUEST_ALLOCATED}
+    )
+    assert status_response.status_code == 403
+
+
+def test_incomplete_coordinate_pair_is_rejected(app):
+    victim_id = create_victim_user(app)
+    with app.app_context():
+        with pytest.raises(ValueError, match="latitude and longitude must be provided together"):
+            create_relief_request(
+                user_id=victim_id,
+                category=CATEGORY_FOOD_WATER,
+                quantity=2,
+                urgency=URGENCY_HIGH,
+                latitude=13.0,
+            )
+
+
+def test_invalid_http_request_payload_returns_client_error(app, client):
+    victim_id = create_victim_user(app)
+    with client.session_transaction() as sess:
+        sess["user_id"] = victim_id
+
+    missing_fields = client.post("/requests/", json={"category": CATEGORY_FOOD_WATER})
+    assert missing_fields.status_code == 400
+    assert "error" in missing_fields.json
+
+    non_object_payload = client.post("/requests/", json=["not", "an", "object"])
+    assert non_object_payload.status_code == 400
+    assert "error" in non_object_payload.json

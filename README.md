@@ -98,6 +98,32 @@ Public registration through both `/auth/register` (JSON API) and `/register` (br
 
 ---
 
+## Relief Request and Incident Workflow API
+
+Relief-request records require authentication. A request submitted by an ordinary signed-in user is associated with that user's session identity; a user-supplied `user_id` cannot be used to impersonate another account. Coordinators and Admins may use the requester field in the existing intake workflow. Victims can view only their own requests, volunteers can view requests assigned to them, and Coordinators/Admins can view all requests.
+
+| Method | Endpoint | Permission | Purpose |
+|---|---|---|---|
+| `POST` | `/requests/` | Signed in | Create a validated relief request |
+| `GET` | `/requests/` | Signed in; results filtered by role | List visible requests, optionally filtered by status |
+| `GET` | `/requests/<request_id>` | Signed in; owner, assigned volunteer, Coordinator or Admin | View one request |
+| `PATCH` | `/requests/<request_id>/status` | Coordinator or Admin | Apply a valid request status transition |
+
+Request creation validates category, positive integer quantity, urgency, coordinate ranges, paired coordinates and an optional existing incident ID. Invalid input returns a client error rather than creating a partial record. Status transitions are checked against the configured workflow; completed and cancelled requests are terminal.
+
+Incident listing and detail retrieval are available through `GET /incidents/` and `GET /incidents/<incident_id>`. Incident creation, editing and status changes are restricted to Coordinators and Admins.
+
+| Method | Endpoint | Permission | Purpose |
+|---|---|---|---|
+| `POST` | `/incidents/` | Coordinator or Admin | Create an incident |
+| `GET` | `/incidents/` | Public read | List incidents, optionally filtered by status |
+| `GET` | `/incidents/<incident_id>` | Public read | Retrieve one incident |
+| `PATCH` | `/incidents/<incident_id>` | Coordinator or Admin | Update title, description, severity or coordinates |
+| `PATCH` | `/incidents/<incident_id>/status` | Coordinator or Admin | Advance/reopen/close an incident through valid status transitions |
+| `GET` | `/incidents/affected-areas` | Public read | Retrieve active affected areas |
+
+Incident creation and editing validate required titles, supported severity values and geographic coordinate ranges. Incident status changes use an explicit transition table, and incident creation, edits and status updates are recorded in the audit log.
+
 ## 🚀 Setup & Execution
 
 ### Prerequisites

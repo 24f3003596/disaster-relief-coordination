@@ -25,10 +25,11 @@ from constants import (
 )
 
 def test_main_pages_load(client):
-    """Test that all primary endpoints load successfully (HTTP 200)."""
-    for path in ['/', '/register', '/login', '/inventory', '/requests', '/assignments', '/volunteers', '/notifications', '/alerts', '/incidents', '/reports']:
+    """Public pages stay reachable; sensitive request records require login."""
+    for path in ['/', '/register', '/login', '/inventory', '/assignments', '/volunteers', '/notifications', '/alerts', '/incidents', '/reports']:
         response = client.get(path)
         assert response.status_code == 200, f"Failed loading {path}: status {response.status_code}"
+    assert client.get('/requests').status_code == 401
 
 def test_end_to_end_relief_workflow(app):
     with app.app_context():
