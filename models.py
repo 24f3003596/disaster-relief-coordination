@@ -13,6 +13,12 @@ class User(db.Model):
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
     role = db.Column(db.String(20), nullable=False, default="Victim")
     password_hash = db.Column(db.String(255), nullable=False)
+    phone_verified = db.Column(db.Boolean, nullable=False, default=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    approval_status = db.Column(db.String(20), nullable=False, default="approved")
+    approval_reviewed_by = db.Column(db.Integer, db.ForeignKey("users.user_id"), nullable=True)
+    approval_reviewed_at = db.Column(db.DateTime, nullable=True)
+    approval_rejection_reason = db.Column(db.String(500), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
 
     relief_requests = db.relationship("ReliefRequest", back_populates="user", lazy=True)
@@ -27,6 +33,9 @@ class User(db.Model):
             "phone": self.phone,
             "email": self.email,
             "role": self.role,
+            "phone_verified": self.phone_verified,
+            "is_active": self.is_active,
+            "approval_status": self.approval_status,
             "created_at": self.created_at.isoformat() + "Z" if self.created_at else None,
         }
 
@@ -198,3 +207,19 @@ class AuditLog(db.Model):
             "entity_id": self.entity_id,
             "created_at": self.created_at.isoformat() + "Z" if self.created_at else None,
         }
+
+
+class PhoneOTP(db.Model):
+    """Hashed, single-use phone verification challenge."""
+    __tablename__ = "phone_otps"
+
+    otp_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.user_id"), nullable=False, index=True)
+    phone = db.Column(db.String(30), nullable=False)
+    otp_hash = db.Column(db.String(255), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    attempts = db.Column(db.Integer, nullable=False, default=0)
+    consumed_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
+
+    user = db.relationship("User", backref=db.backref("phone_otps", lazy=True))

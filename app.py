@@ -1,3 +1,7 @@
+import os
+
+from datetime import datetime
+from werkzeug.security import check_password_hash
 
 from flask import (
     Flask,
@@ -12,7 +16,12 @@ from flask import (
 
 from extensions import db
 from constants import ROLE_VICTIM
-from auth import auth_bp, register_user, authenticate_user
+from auth import (
+    auth_bp,
+    register_user,
+    authenticate_user,
+    _public_registration,
+)
 from incidents import incidents_bp
 from reports import reports_bp
 from inventory import (
@@ -39,7 +48,13 @@ from notifications import (
     list_notifications,
     broadcast_emergency_alert,
 )
-from models import User, Notification, ReliefRequest, InventoryItem, Incident
+from models import (
+    User,
+    Notification,
+    ReliefRequest,
+    InventoryItem,
+    Incident,
+)
 
 
 def create_app(test_config=None):
@@ -50,6 +65,8 @@ def create_app(test_config=None):
         SECRET_KEY="disaster-relief-secret-key-review2",
         SQLALCHEMY_DATABASE_URI="sqlite:///disaster_relief.db",
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        OTP_TTL_MINUTES=5,
+        OTP_DEMO_MODE=os.getenv("OTP_DEMO_MODE", "0") == "1",
     )
 
     if test_config:
@@ -119,7 +136,7 @@ def create_app(test_config=None):
             },
         })
 
-    # FIX: Always load the data required by the Assignments template.
+    # Always load the data required by the Assignments template.
     def assignments_page_context(**extra):
         context = {
             "requests": list_relief_requests(status="Pending"),
@@ -131,34 +148,160 @@ def create_app(test_config=None):
         context.update(extra)
         return context
 
+    # ---------------------------------------------------------
+    # REGISTRATION
+    # ---------------------------------------------------------
+
     @app.route("/register", methods=["GET", "POST"])
     def root_register():
         if request.method == "POST":
             data = request.form
 
             try:
-                user = register_user(
-                    name=data.get("name"),
-                    phone=data.get("phone"),
-                    email=data.get("email"),
-                    password=data.get("password"),
-                    # Do not trust a role supplied in a public HTML form.
-                    role=ROLE_VICTIM,
-                )
+                user, demo_code = _public_registration(data)
 
                 return render_template(
                     "register.html",
-                    message="Account created",
-                    user=user,
+                    message=(
+                        "Account created"
+                        if app.config.get("OTP_AUTO_VERIFY_TESTING")
+                        else (
+                            "Registration received. "
+                            "Verify your phone to activate your account."
+                        )
+                    ),
+                    verification_email=user.email,
+                    verification_phone=user.phone,
+                    demo_otp=(
+                        demo_code
+                        if app.config.get("OTP_DEMO_MODE")
+                        else None
+                    ),
                 ), 200
 
             except ValueError as exc:
+                db.session.rollback()
+
                 return render_template(
                     "register.html",
                     error=str(exc),
                 ), 400
 
         return render_template("register.html"), 200
+
+    # ---------------------------------------------------------
+    # PHONE OTP VERIFICATION
+    # ---------------------------------------------------------
+
+    @app.route("/verify-phone", methods=["GET", "POST"])
+    def root_verify_phone():
+
+        from models import PhoneOTP
+
+        if request.method == "GET":
+
+            # Retrieve email and phone passed from registration.
+            email = (
+                request.args.get("email") or ""
+            ).strip().lower()
+
+            phone = (
+                request.args.get("phone") or ""
+            ).strip()
+
+            return render_template(
+                "verify_phone.html",
+                email=email,
+                phone=phone,
+            ), 200
+
+        # POST: Validate the submitted OTP.
+        email = (
+            request.form.get("email") or ""
+        ).strip().lower()
+
+        phone = (
+            request.form.get("phone") or ""
+        ).strip()
+
+        code = (
+            request.form.get("otp") or ""
+        ).strip()
+
+        # Find the account matching BOTH email and phone.
+        user = User.query.filter_by(
+            email=email,
+            phone=phone,
+        ).first()
+
+        # Find the latest unused OTP for this account.
+        challenge = None
+
+        if user:
+            challenge = (
+                PhoneOTP.query.filter_by(
+                    user_id=user.user_id,
+                    phone=phone,
+                    consumed_at=None,
+                )
+                .order_by(PhoneOTP.created_at.desc())
+                .first()
+            )
+
+        # Validate account and OTP request.
+        if (
+            not user
+            or user.phone_verified
+            or not challenge
+            or challenge.expires_at < datetime.utcnow()
+            or challenge.attempts >= 5
+        ):
+            return render_template(
+                "verify_phone.html",
+                error=(
+                    "OTP expired or verification request is invalid."
+                ),
+                email=email,
+                phone=phone,
+            ), 400
+
+        # Increase the number of verification attempts.
+        challenge.attempts += 1
+
+        # Validate the OTP hash.
+        if not check_password_hash(
+            challenge.otp_hash,
+            code,
+        ):
+            db.session.commit()
+
+            return render_template(
+                "verify_phone.html",
+                error="Incorrect OTP. Please try again.",
+                email=email,
+                phone=phone,
+            ), 400
+
+        # OTP is correct. Mark it as consumed.
+        challenge.consumed_at = datetime.utcnow()
+
+        # Activate the verified account.
+        user.phone_verified = True
+        user.is_active = True
+
+        db.session.commit()
+
+        return render_template(
+            "verify_phone.html",
+            message=(
+                "Phone verified successfully. "
+                "You can now log in."
+            ),
+        ), 200
+
+    # ---------------------------------------------------------
+    # LOGIN
+    # ---------------------------------------------------------
 
     @app.route("/login", methods=["GET", "POST"])
     def root_login():
@@ -197,23 +340,39 @@ def create_app(test_config=None):
 
         return render_template("login.html"), 200
 
+    # ---------------------------------------------------------
+    # LOGOUT
+    # ---------------------------------------------------------
+
     @app.route("/logout", methods=["GET", "POST"])
     def root_logout():
         session.clear()
-        flash("You have been signed out successfully.", "info")
+
+        flash(
+            "You have been signed out successfully.",
+            "info",
+        )
+
         return redirect(url_for("root_login"))
+
+    # ---------------------------------------------------------
+    # ASSIGNMENTS
+    # ---------------------------------------------------------
 
     @app.route("/assignments", methods=["GET", "POST"])
     def root_assignments():
+
         user_id = session.get("user_id")
         user = db.session.get(User, user_id) if user_id else None
 
         if not app.config.get("TESTING"):
+
             if not user:
                 flash(
                     "Please sign in to access assignments.",
                     "warning",
                 )
+
                 return redirect(url_for("root_login"))
 
             if user.role == "Victim":
@@ -222,6 +381,7 @@ def create_app(test_config=None):
                     "to volunteers and coordinators.",
                     "danger",
                 )
+
                 return redirect("/requests")
 
         if request.method == "POST":
@@ -252,7 +412,6 @@ def create_app(test_config=None):
                     **assignments_page_context(error=str(exc)),
                 ), 400
 
-        # FIX: Populate all dropdowns on the initial page load.
         return render_template(
             "assignments.html",
             **assignments_page_context(),
@@ -263,10 +422,14 @@ def create_app(test_config=None):
         methods=["POST"],
     )
     def root_assignment_status(task_id):
+
         new_status = request.form.get("status")
 
         try:
-            task = update_assignment_status(task_id, new_status)
+            task = update_assignment_status(
+                task_id,
+                new_status,
+            )
 
             return render_template(
                 "assignments.html",
@@ -284,8 +447,13 @@ def create_app(test_config=None):
                 **assignments_page_context(error=str(exc)),
             ), 400
 
+    # ---------------------------------------------------------
+    # NOTIFICATIONS
+    # ---------------------------------------------------------
+
     @app.route("/notifications", methods=["GET"])
     def root_notifications():
+
         user_id = session.get("user_id")
 
         if user_id:
@@ -300,17 +468,24 @@ def create_app(test_config=None):
             notifications=notifs,
         ), 200
 
+    # ---------------------------------------------------------
+    # VOLUNTEERS
+    # ---------------------------------------------------------
+
     @app.route("/volunteers", methods=["GET"])
     def root_volunteers():
+
         user_id = session.get("user_id")
         user = db.session.get(User, user_id) if user_id else None
 
         if not app.config.get("TESTING"):
+
             if not user:
                 flash(
                     "Please sign in to view the volunteer directory.",
                     "warning",
                 )
+
                 return redirect(url_for("root_login"))
 
             if user.role not in ["Coordinator", "Admin"]:
@@ -319,6 +494,7 @@ def create_app(test_config=None):
                     "coordinator permissions.",
                     "danger",
                 )
+
                 return redirect(url_for("index"))
 
         return render_template(
@@ -326,17 +502,24 @@ def create_app(test_config=None):
             volunteers=list_volunteers(),
         ), 200
 
+    # ---------------------------------------------------------
+    # EMERGENCY ALERTS
+    # ---------------------------------------------------------
+
     @app.route("/alerts", methods=["GET", "POST"])
     def root_alerts():
+
         user_id = session.get("user_id")
         user = db.session.get(User, user_id) if user_id else None
 
         if not app.config.get("TESTING"):
+
             if not user:
                 flash(
                     "Please sign in as coordinator to broadcast alerts.",
                     "warning",
                 )
+
                 return redirect(url_for("root_login"))
 
             if user.role not in ["Coordinator", "Admin"]:
@@ -345,11 +528,14 @@ def create_app(test_config=None):
                     "coordinator permissions.",
                     "danger",
                 )
+
                 return redirect(url_for("index"))
 
         if request.method == "POST":
+
             message = request.form.get("message")
             type_val = request.form.get("type", "Emergency")
+
             recipient_ids = request.form.getlist(
                 "recipient_user_ids"
             )
@@ -389,8 +575,13 @@ def create_app(test_config=None):
             users=User.query.all(),
         ), 200
 
+    # ---------------------------------------------------------
+    # INCIDENTS
+    # ---------------------------------------------------------
+
     @app.route("/incidents", methods=["GET"])
     def root_incidents():
+
         incidents = Incident.query.order_by(
             Incident.created_at.desc()
         ).all()
@@ -400,17 +591,24 @@ def create_app(test_config=None):
             incidents=incidents,
         ), 200
 
+    # ---------------------------------------------------------
+    # REPORTS
+    # ---------------------------------------------------------
+
     @app.route("/reports", methods=["GET"])
     def root_reports():
+
         user_id = session.get("user_id")
         user = db.session.get(User, user_id) if user_id else None
 
         if not app.config.get("TESTING"):
+
             if not user:
                 flash(
                     "Please sign in to access reports.",
                     "warning",
                 )
+
                 return redirect(url_for("root_login"))
 
             if user.role not in ["Coordinator", "Admin"]:
@@ -419,6 +617,7 @@ def create_app(test_config=None):
                     "coordinator permissions.",
                     "danger",
                 )
+
                 return redirect(url_for("index"))
 
         summary = get_dashboard_summary()
@@ -428,15 +627,56 @@ def create_app(test_config=None):
             summary=summary,
         ), 200
 
+    # ---------------------------------------------------------
+    # DATABASE INITIALIZATION AND MIGRATION
+    # ---------------------------------------------------------
+
     with app.app_context():
+
         import models  # noqa: F401
+
         db.create_all()
+
+        # Lightweight additive migration for existing SQLite databases.
+        from sqlalchemy import inspect, text
+
+        columns = {
+            column["name"]
+            for column in inspect(db.engine).get_columns("users")
+        }
+
+        additions = {
+            "phone_verified": "BOOLEAN NOT NULL DEFAULT 1",
+            "is_active": "BOOLEAN NOT NULL DEFAULT 1",
+            "approval_status": "VARCHAR(20) NOT NULL DEFAULT 'approved'",
+            "approval_reviewed_by": "INTEGER",
+            "approval_reviewed_at": "DATETIME",
+            "approval_rejection_reason": "VARCHAR(500)",
+        }
+
+        for column_name, definition in additions.items():
+
+            if column_name not in columns:
+                db.session.execute(
+                    text(
+                        f"ALTER TABLE users ADD COLUMN "
+                        f"{column_name} {definition}"
+                    )
+                )
+
+        db.session.commit()
 
     return app
 
 
+# =============================================================
+# INITIAL DEMONSTRATION DATA
+# =============================================================
+
 def seed_initial_demo_data():
+
     from werkzeug.security import generate_password_hash
+
     from constants import (
         ROLE_COORDINATOR,
         ROLE_VOLUNTEER,
@@ -456,6 +696,7 @@ def seed_initial_demo_data():
     )
 
     if User.query.first() is None:
+
         coordinator = User(
             name="Coordinator Alice",
             email="coordinator@example.com",
@@ -494,9 +735,11 @@ def seed_initial_demo_data():
             victim,
             admin,
         ])
+
         db.session.commit()
 
     else:
+
         coordinator = User.query.filter_by(
             role=ROLE_COORDINATOR
         ).first()
@@ -506,6 +749,7 @@ def seed_initial_demo_data():
         ).first()
 
     if Incident.query.first() is None and coordinator:
+
         incident1 = Incident(
             title="Coastal Flooding - Sector 4",
             description=(
@@ -531,12 +775,17 @@ def seed_initial_demo_data():
             reported_by=coordinator.user_id,
         )
 
-        db.session.add_all([incident1, incident2])
+        db.session.add_all([
+            incident1,
+            incident2,
+        ])
+
         db.session.commit()
 
     incident = Incident.query.first()
 
     if InventoryItem.query.first() is None:
+
         items = [
             InventoryItem(
                 category=CATEGORY_WATER,
@@ -568,6 +817,7 @@ def seed_initial_demo_data():
         db.session.commit()
 
     if ReliefRequest.query.first() is None and victim:
+
         requests_to_add = [
             ReliefRequest(
                 user_id=victim.user_id,
@@ -601,11 +851,19 @@ def seed_initial_demo_data():
         db.session.commit()
 
 
+# =============================================================
+# APPLICATION ENTRY POINT
+# =============================================================
+
 app = create_app()
 
 
 if __name__ == "__main__":
+
     with app.app_context():
         seed_initial_demo_data()
 
-    app.run(debug=True, port=5000)
+    app.run(
+        debug=True,
+        port=5000,
+    )

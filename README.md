@@ -271,3 +271,32 @@ Comprehensive evidence documents prepared for the Review 2 evaluation are availa
 - **7. Sprint Review & Retrospective Notes**: [Word (`.docx`)](docs/Sprint_Review_and_Retrospective.docx) | [Markdown (`.md`)](docs/SPRINT_REVIEW_AND_RETROSPECTIVE.md) — Scope delivery across 13 JIRA user stories (`TEAM20-16` to `TEAM20-28`) and retrospective analysis.
 
 
+
+
+## Sprint 4 security workflows
+
+### Phone OTP registration
+
+Public registration (`POST /auth/register` or the browser `/register` form) always creates a **Victim** account, regardless of any submitted role. The account is inactive until phone verification succeeds. OTPs are six digits, expire after five minutes by default, allow at most five incorrect attempts, are stored only as password hashes, and are single-use.
+
+For a local demonstration without an SMS provider, enable the development-only delivery mode before starting Flask:
+
+- Windows PowerShell: `$env:OTP_DEMO_MODE="1"`
+- macOS/Linux: `export OTP_DEMO_MODE=1`
+
+The OTP is printed to the Flask server console and included in the registration response/page **only** when this flag is enabled. Keep it disabled in production (`OTP_DEMO_MODE=0`). The demo code is not persisted in plaintext. In a production deployment, replace the console demonstration delivery with an approved SMS provider while keeping the verification endpoint and hashed challenge storage.
+
+API verification: `POST /auth/verify-phone` with `{ "email": "...", "phone": "...", "otp": "123456" }`.
+
+### Privileged account approval
+
+An Admin may assign `Coordinator` or `Admin` to an existing account through `PATCH /auth/users/<user_id>/role`. Such a role change sets `approval_status` to `pending`, and the target cannot log in with privileged access until reviewed.
+
+- `GET /auth/admin/pending-approvals` — list pending privileged accounts (Admin only).
+- `POST /auth/admin/users/<user_id>/approval` — Admin-only JSON body: `{ "decision": "approve" }` or `{ "decision": "reject", "reason": "..." }`.
+
+Rejected accounts remain blocked. A later role change by an Admin resets the approval state to pending. The approval reviewer and review timestamp are persisted. Public registration never accepts a privileged role. The Python `register_user` helper is intended for trusted internal provisioning/seed/test setup; it must not be exposed as a public endpoint.
+
+### Database update
+
+The application creates the new OTP table and applies additive columns to the existing `users` table at startup. Back up `disaster_relief.db` before deploying the update.

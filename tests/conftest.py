@@ -13,6 +13,7 @@ def app(tmp_path):
         "SECRET_KEY": "test-secret",
         "SQLALCHEMY_DATABASE_URI": f"sqlite:///{database_path.as_posix()}",
         "WTF_CSRF_ENABLED": False,
+        "OTP_AUTO_VERIFY_TESTING": True,
     })
     with app.app_context():
         db.drop_all()

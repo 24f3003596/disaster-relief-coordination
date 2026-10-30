@@ -255,6 +255,12 @@ def test_automated_workflow_via_http_client(client, app):
     )
     assert response.status_code == 200
 
+    approval = client.post(
+        f"/auth/admin/users/{coord_id}/approval",
+        json={"decision": "approve"},
+    )
+    assert approval.status_code == 200
+
     response = client.patch(
         f"/auth/users/{vol_id}/role",
         json={"role": ROLE_VOLUNTEER},
