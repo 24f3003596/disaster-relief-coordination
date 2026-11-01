@@ -1,6 +1,6 @@
 # Disaster Relief Resource Coordination System (Team 20)
 
-**Software Engineering Project — Sprint 4 Map Visualization Increment**
+**Software Engineering Project — Sprint 4 (Review 4) Complete Delivery**
 
 An integrated, role-based web application and API for managing disaster incidents, emergency relief requests, warehouse inventory, volunteer dispatching, notifications, and coordinator operations.
 
@@ -175,19 +175,19 @@ Open **`http://127.0.0.1:5000/`** in your browser.
 ```bash
 pytest -v
 ```
-**Result**: **94 passed, 0 failures (100% pass rate)** — verified on `main` post Sprint 3 integration, Python 3.14.5, pytest 9.1.1. (Baseline pre-Sprint 3: 62 passed; +32 new tests added in Sprint 3). Always re-run after any code or test change to get current figures.
+**Result**: **126 passed, 0 failures (100% pass rate)** — verified on `main` post Sprint 4 integration, Python 3.14.5, pytest 9.1.1. (Baseline pre-Sprint 4: 94 passed; +32 new tests added across Sprint 4: 16 dashboard/shortage tests, 6 map view tests, 10 security/OTP tests). Always re-run after any code or test change to get current figures.
 
 ### Run Test Coverage
 ```bash
 pytest --cov=. --cov-report=term-missing
 ```
-**Coverage**: **~80% statement coverage** across core application modules (raw `pytest-cov` total is 50%; the `routes/` mirror package and `build_all_word_documents.py` inflate the denominator — see [`docs/CODE_COVERAGE_REPORT.md`](docs/CODE_COVERAGE_REPORT.md) for the full breakdown).
+**Coverage**: **~81% statement coverage** across core application modules (`dashboard.py`: 91%, `reports.py`: 92%, `assignments.py`: 80%, `inventory.py`: 78%, `notifications.py`: 72% — see [`docs/CODE_COVERAGE_REPORT.md`](docs/CODE_COVERAGE_REPORT.md) for the full breakdown).
 
 ### Run Cyclomatic Complexity Check (Radon)
 ```bash
 radon cc . -s -a
 ```
-**Complexity Rating**: **Grade A (average 4.65)** across 289 analysed functions, methods, and classes.
+**Complexity Rating**: **Grade A (average 4.83)** across 360 analysed functions, methods, and classes.
 
 ---
 
@@ -211,6 +211,11 @@ All team feature branches were developed on dedicated branch tracks and merged i
 8. `feature/sprint3-relief-incident-workflow` by **Vishal K V** (PR #4 — merged, TEAM20-59/60: Validate relief requests and incident workflows)
 9. `sprint-3-sivanesh` by **SIVANESH** (merged, TEAM20-61/62: Strengthen RBAC and regression testing)
 10. `feature/sprint3-inventory-consistency` by **Sree Naresh A** (merged, TEAM20-63: Verify inventory and resource allocation consistency)
+
+**Sprint 4 (Review 4)**
+11. `feature/sprint4-map-visualization` by **Vishal K V** (PR #5 — merged: Disaster map visualization and geospatial filters)
+12. `sprint4-admin-approval-otp` by **SIVANESH** (merged: Admin approval queue and phone OTP challenge verification)
+13. `feature/sprint4-dashboard-analytics-shortage` by **Sree Naresh A** (merged: Dashboard analytics, Admin CSV exports, and automated critical shortage notifications)
 
 All authors are credited in the Git commit tree and appear on GitHub's Contributors graph.
 
@@ -258,6 +263,20 @@ All authors are credited in the Git commit tree and appear on GitHub's Contribut
 | TEAM20-62 | Integrate and Review Sprint 3 — Sivanesh | SIVANESH | 3 | Done |
 | TEAM20-63 | Verify Inventory and Resource Consistency | Sree Naresh A | 5 | Done |
 | TEAM20-64 | Integrate and Review Sprint 3 Changes | Sree Naresh A | 3 | Done |
+
+
+### Sprint 4 JIRA Tickets
+| Ticket | Title | Assignee | Story Points | Status |
+|---|---|---|---|---|
+| TEAM20-66 | Disaster Map Visualization and Geospatial Filters | Vishal K V | 5 | Done |
+| TEAM20-67 | Review & Integration of Map Features | Vishal K V | 3 | Done |
+| TEAM20-68 | Admin Approval Queue and Phone OTP Verification | SIVANESH | 5 | Done |
+| TEAM20-69 | Execute Sprint 4 Regression Testing & Evidence | SIVANESH | 3 | Done |
+| TEAM20-70 | Complete Dashboard Analytics and CSV Export | Sree Naresh A | 5 | Done |
+| TEAM20-71 | Automate Critical-Shortage Notifications | Sree Naresh A | 3 | Done |
+
+### Status for Review 4
+All 6 Sprint 4 tickets are **Done**. All feature branches merged into `main` preserving authorship without conflicts. Post-integration test suite: **126 passed, 0 failures (100% pass rate)** (see [`docs/TEST_EXECUTION_REPORT.md`](docs/TEST_EXECUTION_REPORT.md)).
 
 ### Status for Review 3
 All 6 Sprint 3 tickets are **Done**. All Sprint 3 feature branches merged into `main` via `integration/sprint3-main`. Post-integration test suite: **94 passed, 0 failures (100% pass rate)** (see [`docs/TEST_EXECUTION_REPORT.md`](docs/TEST_EXECUTION_REPORT.md)).

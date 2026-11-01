@@ -1,9 +1,9 @@
-# Test Case Document — Sprint 3 (Review 3)
+# Test Case Document — Sprint 4 (Review 4)
 
 **Project**: Disaster Relief Resource Coordination System (Team 20)
-**Branch**: `main` (post Sprint 3 integration)
-**Date**: 2026-10-29
-**Total Test Cases**: 94
+**Branch**: `main` (post Sprint 4 integration)
+**Date**: 2026-11-01
+**Total Test Cases**: 126
 
 ---
 
@@ -193,6 +193,60 @@
 
 ---
 
+
+---
+
+## TC-095 to TC-100 — Disaster Map Visualization (`test_map_view.py`)
+
+| ID | Test Name | Focus | Status |
+|---|---|---|---|
+| TC-095 | `test_map_page_requires_operational_role` | Map UI restricted to Coordinator and Admin | ✅ PASS |
+| TC-096 | `test_map_data_returns_incidents_and_requests` | GeoJSON marker data returned for active items | ✅ PASS |
+| TC-097 | `test_map_data_filters_by_category` | Filtering markers by resource category | ✅ PASS |
+| TC-098 | `test_map_data_filters_by_severity` | Filtering incident markers by severity | ✅ PASS |
+| TC-099 | `test_map_data_bounding_box_filter` | Spatial filtering by lat/lng bounding box | ✅ PASS |
+| TC-100 | `test_map_data_invalid_bbox_rejected` | Malformed coordinates return 400 | ✅ PASS |
+
+---
+
+## TC-101 to TC-110 — Registration Security & OTP Verification (`test_sprint4_security.py`)
+
+| ID | Test Name | Focus | Status |
+|---|---|---|---|
+| TC-101 | `test_public_registration_requires_phone_and_otp` | Registration requires phone & generates OTP | ✅ PASS |
+| TC-102 | `test_production_registration_does_not_return_otp` | Production config never leaks demo OTP | ✅ PASS |
+| TC-103 | `test_expired_otp_is_rejected` | Expired OTP challenges return 400 | ✅ PASS |
+| TC-104 | `test_incorrect_otp_increments_attempts` | Incorrect OTP increments attempt counter | ✅ PASS |
+| TC-105 | `test_privileged_role_assignment_requires_admin_approval` | Elevated role assignment enters pending approval | ✅ PASS |
+| TC-106 | `test_admin_can_approve_privileged_account` | Admin approval activates privileged access | ✅ PASS |
+| TC-107 | `test_rejection_blocks_privileged_login` | Rejected account is marked inactive | ✅ PASS |
+| TC-108 | `test_admin_cannot_approve_own_account` | Admin cannot self-approve | ✅ PASS |
+| TC-109 | `test_pending_approval_list_restricted_to_admin` | Non-admin cannot view approval queue | ✅ PASS |
+| TC-110 | `test_re_evaluating_role_resets_approval_state` | Changing role resets approval status to pending | ✅ PASS |
+
+---
+
+## TC-111 to TC-126 — Dashboard Analytics & Critical Shortage (`test_sprint4_dashboard_shortage.py`)
+
+| ID | Test Name | Focus | Status |
+|---|---|---|---|
+| TC-111 | `test_dashboard_displays_request_counts_by_category_and_status` | Category & status aggregations match DB | ✅ PASS |
+| TC-112 | `test_average_response_time_calculation_with_timestamps` | Response & fulfillment time calculation | ✅ PASS |
+| TC-113 | `test_resource_utilization_rate_calculation` | `(allocated / total_capacity) * 100` formula | ✅ PASS |
+| TC-114 | `test_empty_datasets_and_zero_denominators_handled_safely` | Empty DB evaluated safely (0.0 values) | ✅ PASS |
+| TC-115 | `test_admin_can_export_relief_requests_csv` | Requests CSV download with standard headers | ✅ PASS |
+| TC-116 | `test_admin_can_export_inventory_csv` | Inventory CSV download with standard headers | ✅ PASS |
+| TC-117 | `test_csv_export_access_control_denies_unauthorized_users` | 401 unauth, 403 Victim/Volunteer/Coordinator | ✅ PASS |
+| TC-118 | `test_shortage_notification_generated_when_stock_at_or_below_threshold_with_pending_requests` | Shortage alert triggered on dual condition | ✅ PASS |
+| TC-119 | `test_shortage_without_matching_pending_requests_does_not_alert` | Zero pending requests suppresses alert | ✅ PASS |
+| TC-120 | `test_non_shortage_scenario_above_threshold_does_not_alert` | Healthy stock suppresses alert | ✅ PASS |
+| TC-121 | `test_exact_threshold_boundary_conditions` | Boundary test: `quantity == threshold` | ✅ PASS |
+| TC-122 | `test_unauthorized_recipients_do_not_receive_shortage_alerts` | Victims and Volunteers excluded from alerts | ✅ PASS |
+| TC-123 | `test_repeated_operations_do_not_duplicate_shortage_notifications` | Deduplication prevents duplicate unread alerts | ✅ PASS |
+| TC-124 | `test_replenishment_and_subsequent_shortage_allows_new_notification` | Acknowledged alert allows re-alerting | ✅ PASS |
+| TC-125 | `test_allocation_automatically_triggers_shortage_notification` | Allocation deduction triggers shortage check | ✅ PASS |
+| TC-126 | `test_new_pending_request_triggers_shortage_if_stock_already_low` | New pending request triggers shortage alert | ✅ PASS |
+
 ## Summary
 
 | Module | Tests | Pass |
@@ -211,4 +265,7 @@
 | Reports | 4 | 4 |
 | Requests | 11 | 11 |
 | Volunteers | 4 | 4 |
-| **TOTAL** | **94** | **94** |
+| Map Visualization (Sprint 4) | 6 | 6 |
+| Registration Security & OTP (Sprint 4) | 10 | 10 |
+| Dashboard Analytics & Shortages (Sprint 4) | 16 | 16 |
+| **TOTAL** | **126** | **126** |
