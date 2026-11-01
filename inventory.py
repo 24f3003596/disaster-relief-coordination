@@ -5,6 +5,7 @@ from extensions import db
 from models import InventoryItem
 from auth import login_required, roles_required
 from audit import log_action
+from notifications import check_and_notify_critical_shortage
 from constants import VALID_CATEGORIES, ACTION_CREATE_INVENTORY, ACTION_UPDATE_INVENTORY
 
 inventory_bp = Blueprint("inventory", __name__)
@@ -68,7 +69,7 @@ def create_inventory_item(category, quantity, storage_location, expiry_date=None
         entity_type="InventoryItem",
         entity_id=item.item_id,
     )
-
+    check_and_notify_critical_shortage(category=item.category)
     return item
 
 def list_inventory_items(category=None, available_only=False):
@@ -99,6 +100,7 @@ def update_inventory_stock(item_id, quantity_change, actor_id=None):
         entity_type="InventoryItem",
         entity_id=item.item_id,
     )
+    check_and_notify_critical_shortage(category=item.category)
     return item
 
 @inventory_bp.post("/")

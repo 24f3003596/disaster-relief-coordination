@@ -1,1 +1,59 @@
-{% extends 'base.html' %}{% block content %}<h1>Relief request report</h1><p>Total requests in report: {{rows|length}}</p><table class="table table-striped"><tr><th>ID</th><th>User</th><th>Category</th><th>Quantity</th><th>Urgency</th><th>Status</th><th>Created</th></tr>{% for r in rows %}<tr>{% for k in ['request_id','user_id','category','quantity','urgency','status','created_at'] %}<td>{{r[k]}}</td>{% endfor %}</tr>{% endfor %}</table>{% endblock %}
+{% extends 'base.html' %}
+{% block title %}Operational Reports - DRRCS{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold text-dark mb-1"><i class="bi bi-bar-chart-line text-primary me-2"></i>Operational Relief Reports</h2>
+        <p class="text-muted mb-0">Relief requests, resource utilization, and warehouse data exports</p>
+    </div>
+    {% if current_user and current_user.role == 'Admin' %}
+    <div class="d-flex gap-2">
+        <a href="/reports/export/requests" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Export Requests CSV</a>
+        <a href="/reports/export/inventory" class="btn btn-outline-primary"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Export Inventory CSV</a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+        <h5 class="fw-bold mb-0 text-dark">Filtered Relief Requests</h5>
+        <span class="badge bg-primary">{{ rows|length if rows is defined else 0 }} records</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Category</th>
+                        <th>Quantity</th>
+                        <th>Urgency</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if rows %}
+                        {% for r in rows %}
+                        <tr>
+                            <td><span class="badge bg-light text-dark border">#{{ r['request_id'] }}</span></td>
+                            <td>{{ r['user_id'] }}</td>
+                            <td class="fw-semibold">{{ r['category'] }}</td>
+                            <td>{{ r['quantity'] }}</td>
+                            <td><span class="badge bg-secondary">{{ r['urgency'] }}</span></td>
+                            <td><span class="badge bg-info text-dark">{{ r['status'] }}</span></td>
+                            <td class="small text-muted">{{ r['created_at'][:19] if r['created_at'] else '' }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">No report records found matching query criteria.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
