@@ -1,6 +1,6 @@
 # Disaster Relief Resource Coordination System (Team 20)
 
-**Software Engineering Project — Sprint 3 (Review 3) Delivery**
+**Software Engineering Project — Sprint 4 Map Visualization Increment**
 
 An integrated, role-based web application and API for managing disaster incidents, emergency relief requests, warehouse inventory, volunteer dispatching, notifications, and coordinator operations.
 
@@ -23,8 +23,9 @@ The project strictly follows the **Application Factory** and **Flask Blueprint**
 ```text
 disaster-relief-coordination/
 ├── app.py                      # Application factory (create_app), session management, error handlers, demo seeder
+├── map_view.py                 # Coordinator disaster map and filtered geospatial data API
 ├── requirements.txt            # Project dependencies (Flask, SQLAlchemy, pytest, pytest-cov, radon)
-├── README.md                   # Complete Review 2 documentation & user guide
+├── README.md                   # Project documentation and user guide
 │
 ├── core/                       # Core database models, system constants & extensions
 │   ├── __init__.py             # Exposes db, models, constants
@@ -48,7 +49,7 @@ disaster-relief-coordination/
 ├── static/
 │   └── style.css               # Clean styling and UI accents
 │
-├── templates/                  # 12 Responsive Bootstrap Jinja2 templates (role-adaptive navigation)
+├── templates/                  # 13 Responsive Bootstrap Jinja2 templates (role-adaptive navigation)
 │   ├── base.html               # Master layout with dynamic role indicators, navbar, & alerts
 │   ├── login.html              # Login page with 1-click Quick Demo logins
 │   ├── register.html           # User registration page
@@ -60,7 +61,8 @@ disaster-relief-coordination/
 │   ├── volunteers.html         # Volunteer directory and task view
 │   ├── notifications.html      # User notifications inbox
 │   ├── alerts.html             # Emergency broadcast console
-│   └── reports.html            # Operational reporting page
+│   ├── reports.html            # Operational reporting page
+│   └── map.html                # Disaster map, filters, legend and 30-second refresh
 │
 └── tests/
     ├── conftest.py             # Test app fixtures, in-memory SQLite DB, and client setup
@@ -77,7 +79,8 @@ disaster-relief-coordination/
     ├── test_integration.py     # Multi-module end-to-end integration tests
     ├── test_end_to_end_workflow.py # Full lifecycle workflow tests
     ├── test_rbac.py                # RBAC enforcement and access-control regression tests
-    └── test_inventory_resource_consistency.py # Inventory and allocation consistency (Sprint 3)
+    ├── test_inventory_resource_consistency.py # Inventory and allocation consistency (Sprint 3)
+    └── test_map_view.py        # Map permissions, coordinate markers, filters and viewport regions
 ```
 
 ---
@@ -125,6 +128,14 @@ Incident listing and detail retrieval are available through `GET /incidents/` an
 | `GET` | `/incidents/affected-areas` | Public read | Retrieve active affected areas |
 
 Incident creation and editing validate required titles, supported severity values and geographic coordinate ranges. Incident status changes use an explicit transition table, and incident creation, edits and status updates are recorded in the audit log.
+
+## Disaster Operations Map (Sprint 4)
+
+The coordinator/admin-only map is available at `GET /map/`. Its data endpoint is `GET /map/data` and returns geocoded active relief-request and active incident markers by default; completed/cancelled requests and resolved/closed incidents can be explicitly selected with the status filter. It supports request-category filtering for request markers, shared status filtering, text search over saved request locations and incident titles/descriptions, and geographic viewport filtering with `viewport=1&south=...&west=...&north=...&east=...`. Invalid filters or viewport bounds return HTTP 400. Unauthenticated users receive HTTP 401 and non-operational roles receive HTTP 403.
+
+The map refreshes marker data every 30 seconds and also refreshes when filters change. Responses use no-cache headers so status changes can be observed promptly. Request markers are colored by urgency and incident markers by severity.
+
+**Coordinate coverage limitation:** the current schema stores coordinates for incidents and optionally for relief requests. Volunteer profiles and inventory storage locations currently have no coordinate fields, so the map reports their counts as not plotted rather than inventing positions. Incident region text matching searches incident titles/descriptions because the incident model has no separate region/address field.
 
 ## 🚀 Setup & Execution
 

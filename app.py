@@ -40,6 +40,7 @@ from notifications import (
     broadcast_emergency_alert,
 )
 from models import User, Notification, ReliefRequest, InventoryItem, Incident
+from map_view import map_bp
 
 
 def create_app(test_config=None):
@@ -60,6 +61,7 @@ def create_app(test_config=None):
     # Register application blueprints.
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(incidents_bp, url_prefix="/incidents")
+    app.register_blueprint(map_bp, url_prefix="/map")
     app.register_blueprint(reports_bp, url_prefix="/reports")
     app.register_blueprint(inventory_bp, url_prefix="/inventory")
     app.register_blueprint(requests_bp, url_prefix="/requests")
@@ -115,6 +117,7 @@ def create_app(test_config=None):
                 "relief_requests": "GET/POST /requests/",
                 "assignments": "GET/POST /assignments/",
                 "incidents": "GET/POST /incidents/",
+                "operations_map": "GET /map/ (Coordinator/Admin); GET /map/data (filtered map markers)",
                 "reports": "GET /reports/summary",
             },
         })
