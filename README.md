@@ -1,6 +1,6 @@
 # Disaster Relief Resource Coordination System (Team 20)
 
-**Software Engineering Project — Sprint 3 (Review 3) Delivery**
+**Software Engineering Project — Sprint 4 Map Visualization Increment**
 
 An integrated, role-based web application and API for managing disaster incidents, emergency relief requests, warehouse inventory, volunteer dispatching, notifications, and coordinator operations.
 
@@ -23,8 +23,9 @@ The project strictly follows the **Application Factory** and **Flask Blueprint**
 ```text
 disaster-relief-coordination/
 ├── app.py                      # Application factory (create_app), session management, error handlers, demo seeder
+├── map_view.py                 # Coordinator disaster map and filtered geospatial data API
 ├── requirements.txt            # Project dependencies (Flask, SQLAlchemy, pytest, pytest-cov, radon)
-├── README.md                   # Complete Review 2 documentation & user guide
+├── README.md                   # Project documentation and user guide
 │
 ├── core/                       # Core database models, system constants & extensions
 │   ├── __init__.py             # Exposes db, models, constants
@@ -48,7 +49,7 @@ disaster-relief-coordination/
 ├── static/
 │   └── style.css               # Clean styling and UI accents
 │
-├── templates/                  # 12 Responsive Bootstrap Jinja2 templates (role-adaptive navigation)
+├── templates/                  # 13 Responsive Bootstrap Jinja2 templates (role-adaptive navigation)
 │   ├── base.html               # Master layout with dynamic role indicators, navbar, & alerts
 │   ├── login.html              # Login page with 1-click Quick Demo logins
 │   ├── register.html           # User registration page
@@ -60,7 +61,8 @@ disaster-relief-coordination/
 │   ├── volunteers.html         # Volunteer directory and task view
 │   ├── notifications.html      # User notifications inbox
 │   ├── alerts.html             # Emergency broadcast console
-│   └── reports.html            # Operational reporting page
+│   ├── reports.html            # Operational reporting page
+│   └── map.html                # Disaster map, filters, legend and 30-second refresh
 │
 └── tests/
     ├── conftest.py             # Test app fixtures, in-memory SQLite DB, and client setup
@@ -77,7 +79,8 @@ disaster-relief-coordination/
     ├── test_integration.py     # Multi-module end-to-end integration tests
     ├── test_end_to_end_workflow.py # Full lifecycle workflow tests
     ├── test_rbac.py                # RBAC enforcement and access-control regression tests
-    └── test_inventory_resource_consistency.py # Inventory and allocation consistency (Sprint 3)
+    ├── test_inventory_resource_consistency.py # Inventory and allocation consistency (Sprint 3)
+    └── test_map_view.py        # Map permissions, coordinate markers, filters and viewport regions
 ```
 
 ---
@@ -125,6 +128,14 @@ Incident listing and detail retrieval are available through `GET /incidents/` an
 | `GET` | `/incidents/affected-areas` | Public read | Retrieve active affected areas |
 
 Incident creation and editing validate required titles, supported severity values and geographic coordinate ranges. Incident status changes use an explicit transition table, and incident creation, edits and status updates are recorded in the audit log.
+
+## Disaster Operations Map (Sprint 4)
+
+The coordinator/admin-only map is available at `GET /map/`. Its data endpoint is `GET /map/data` and returns geocoded active relief-request and active incident markers by default; completed/cancelled requests and resolved/closed incidents can be explicitly selected with the status filter. It supports request-category filtering for request markers, shared status filtering, text search over saved request locations and incident titles/descriptions, and geographic viewport filtering with `viewport=1&south=...&west=...&north=...&east=...`. Invalid filters or viewport bounds return HTTP 400. Unauthenticated users receive HTTP 401 and non-operational roles receive HTTP 403.
+
+The map refreshes marker data every 30 seconds and also refreshes when filters change. Responses use no-cache headers so status changes can be observed promptly. Request markers are colored by urgency and incident markers by severity.
+
+**Coordinate coverage limitation:** the current schema stores coordinates for incidents and optionally for relief requests. Volunteer profiles and inventory storage locations currently have no coordinate fields, so the map reports their counts as not plotted rather than inventing positions. Incident region text matching searches incident titles/descriptions because the incident model has no separate region/address field.
 
 ## 🚀 Setup & Execution
 
@@ -271,3 +282,32 @@ Comprehensive evidence documents prepared for the Review 2 evaluation are availa
 - **7. Sprint Review & Retrospective Notes**: [Word (`.docx`)](docs/Sprint_Review_and_Retrospective.docx) | [Markdown (`.md`)](docs/SPRINT_REVIEW_AND_RETROSPECTIVE.md) — Scope delivery across 13 JIRA user stories (`TEAM20-16` to `TEAM20-28`) and retrospective analysis.
 
 
+
+
+## Sprint 4 security workflows
+
+### Phone OTP registration
+
+Public registration (`POST /auth/register` or the browser `/register` form) always creates a **Victim** account, regardless of any submitted role. The account is inactive until phone verification succeeds. OTPs are six digits, expire after five minutes by default, allow at most five incorrect attempts, are stored only as password hashes, and are single-use.
+
+For a local demonstration without an SMS provider, enable the development-only delivery mode before starting Flask:
+
+- Windows PowerShell: `$env:OTP_DEMO_MODE="1"`
+- macOS/Linux: `export OTP_DEMO_MODE=1`
+
+The OTP is printed to the Flask server console and included in the registration response/page **only** when this flag is enabled. Keep it disabled in production (`OTP_DEMO_MODE=0`). The demo code is not persisted in plaintext. In a production deployment, replace the console demonstration delivery with an approved SMS provider while keeping the verification endpoint and hashed challenge storage.
+
+API verification: `POST /auth/verify-phone` with `{ "email": "...", "phone": "...", "otp": "123456" }`.
+
+### Privileged account approval
+
+An Admin may assign `Coordinator` or `Admin` to an existing account through `PATCH /auth/users/<user_id>/role`. Such a role change sets `approval_status` to `pending`, and the target cannot log in with privileged access until reviewed.
+
+- `GET /auth/admin/pending-approvals` — list pending privileged accounts (Admin only).
+- `POST /auth/admin/users/<user_id>/approval` — Admin-only JSON body: `{ "decision": "approve" }` or `{ "decision": "reject", "reason": "..." }`.
+
+Rejected accounts remain blocked. A later role change by an Admin resets the approval state to pending. The approval reviewer and review timestamp are persisted. Public registration never accepts a privileged role. The Python `register_user` helper is intended for trusted internal provisioning/seed/test setup; it must not be exposed as a public endpoint.
+
+### Database update
+
+The application creates the new OTP table and applies additive columns to the existing `users` table at startup. Back up `disaster_relief.db` before deploying the update.

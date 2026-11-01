@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Verify Phone Number
+{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center py-4">
+
+    <div class="col-md-6">
+
+        <div class="card p-4 shadow-sm border-0">
+
+            <h3 class="fw-bold mb-3">
+                Verify Phone Number
+            </h3>
+
+            {% if message %}
+
+                <div class="alert alert-success">
+                    {{ message }}
+                </div>
+
+                <a
+                    href="{{ url_for('root_login') }}"
+                    class="btn btn-primary w-100"
+                >
+                    Go to Login
+                </a>
+
+            {% else %}
+
+                {% if error %}
+                    <div class="alert alert-danger">
+                        {{ error }}
+                    </div>
+                {% endif %}
+
+                <form
+                    method="POST"
+                    action="{{ url_for('root_verify_phone') }}"
+                >
+
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            Email
+                        </label>
+
+                        <input
+                            class="form-control"
+                            type="email"
+                            name="email"
+                            value="{{ email or '' }}"
+                            required
+                        >
+
+                    </div>
+
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            Phone
+                        </label>
+
+                        <input
+                            class="form-control"
+                            type="tel"
+                            name="phone"
+                            value="{{ phone or '' }}"
+                            required
+                        >
+
+                    </div>
+
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            6-digit OTP
+                        </label>
+
+                        <input
+                            class="form-control"
+                            type="text"
+                            name="otp"
+                            inputmode="numeric"
+                            pattern="[0-9]{6}"
+                            maxlength="6"
+                            minlength="6"
+                            placeholder="Enter your OTP"
+                            required
+                        >
+
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary w-100"
+                    >
+                        Verify and Activate
+                    </button>
+
+                </form>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

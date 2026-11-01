@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+{% block title %}Disaster Operations Map{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+  <div>
+    <h1 class="mb-1">Disaster Operations Map</h1>
+    <p class="text-muted mb-0">Live operational view of geocoded relief requests and incidents. Data refreshes every 30 seconds.</p>
+  </div>
+  <button type="button" class="btn btn-outline-primary" id="refreshMapButton">
+    <i class="bi bi-arrow-clockwise me-1"></i>Refresh now
+  </button>
+</div>
+
+<section class="card shadow-sm mb-3" aria-label="Map filters">
+  <div class="card-body">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label" for="categoryFilter">Request category</label>
+        <select class="form-select" id="categoryFilter">
+          <option value="">All categories</option>
+          {% for category in categories %}<option value="{{ category }}">{{ category }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="statusFilter">Status</label>
+        <select class="form-select" id="statusFilter">
+          <option value="">All statuses</option>
+          {% for status in statuses %}<option value="{{ status }}">{{ status }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="regionFilter">Region / area search</label>
+        <input class="form-control" id="regionFilter" type="search" maxlength="100" placeholder="Search saved request location or incident details">
+      </div>
+      <div class="col-md-2">
+        <button type="button" class="btn btn-secondary w-100" id="clearFiltersButton">Clear filters</button>
+      </div>
+      <div class="col-12">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="1" id="viewportFilter">
+          <label class="form-check-label" for="viewportFilter">Limit results to the current visible map area (geographic region)</label>
+        </div>
+        <small class="text-muted">Text search uses saved relief-request locations and incident titles/descriptions. The map-area option filters by coordinates.</small>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-8">
+    <div id="disasterMap" class="rounded border" role="application" aria-label="Map showing relief requests and disaster incidents" style="height: 560px; min-height: 380px;"></div>
+  </div>
+  <div class="col-lg-4">
+    <section class="card h-100 shadow-sm">
+      <div class="card-body">
+        <h2 class="h5">Map legend</h2>
+        <p class="mb-2"><span class="d-inline-block rounded-circle me-2" style="width:12px;height:12px;background:#b91c1c"></span>Critical urgency / severity</p>
+        <p class="mb-2"><span class="d-inline-block rounded-circle me-2" style="width:12px;height:12px;background:#ea580c"></span>High urgency / severity</p>
+        <p class="mb-2"><span class="d-inline-block rounded-circle me-2" style="width:12px;height:12px;background:#ca8a04"></span>Medium urgency / severity</p>
+        <p class="mb-2"><span class="d-inline-block rounded-circle me-2" style="width:12px;height:12px;background:#15803d"></span>Low urgency / severity</p>
+        <hr>
+        <h2 class="h6">Refresh status</h2>
+        <p id="mapStatus" class="small text-muted" role="status" aria-live="polite">Loading map data…</p>
+        <p class="small mb-1">Last refreshed: <span id="lastRefreshed">Not yet loaded</span></p>
+        <hr>
+        <h2 class="h6">Records not plotted</h2>
+        <p class="small text-muted mb-0" id="unmappedSummary">Loading location coverage…</p>
+        <p class="small text-muted mt-2 mb-0">The current data model stores no coordinates for volunteer profiles or inventory storage locations. Those records are not assigned invented map positions.</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+(() => {
+  const dataUrl = {{ url_for('map_view.map_data')|tojson }};
+  const refreshIntervalMs = {{ refresh_interval_seconds * 1000 }};
+  const map = L.map('disasterMap').setView([13.0827, 80.2707], 11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  const markerLayer = L.layerGroup().addTo(map);
+  const categoryFilter = document.getElementById('categoryFilter');
+  const statusFilter = document.getElementById('statusFilter');
+  const regionFilter = document.getElementById('regionFilter');
+  const viewportFilter = document.getElementById('viewportFilter');
+  const mapStatus = document.getElementById('mapStatus');
+  const lastRefreshed = document.getElementById('lastRefreshed');
+  const unmappedSummary = document.getElementById('unmappedSummary');
+  let didFitMarkers = false;
+  let regionSearchTimer = null;
+  let activeRequest = null;
+
+  const levelColors = {
+    Critical: '#b91c1c',
+    High: '#ea580c',
+    Medium: '#ca8a04',
+    Low: '#15803d'
+  };
+
+  function buildPopup(title, fields) {
+    const wrapper = document.createElement('div');
+    const heading = document.createElement('strong');
+    heading.textContent = title;
+    wrapper.appendChild(heading);
+    fields.forEach(([label, value]) => {
+      const line = document.createElement('div');
+      line.textContent = `${label}: ${value ?? 'Not available'}`;
+      wrapper.appendChild(line);
+    });
+    return wrapper;
+  }
+
+  function addMarker(item, kind) {
+    const level = kind === 'request' ? item.urgency : item.severity;
+    const color = levelColors[level] || '#2563eb';
+    const marker = L.circleMarker([item.latitude, item.longitude], {
+      radius: kind === 'incident' ? 10 : 8,
+      color,
+      fillColor: color,
+      fillOpacity: 0.78,
+      weight: 2
+    });
+
+    if (kind === 'request') {
+      marker.bindPopup(buildPopup(`Relief Request #${item.request_id}`, [
+        ['Category', item.category], ['Quantity', item.quantity],
+        ['Urgency', item.urgency], ['Status', item.status], ['Location', item.location]
+      ]));
+    } else {
+      marker.bindPopup(buildPopup(`Incident #${item.incident_id}: ${item.title}`, [
+        ['Severity', item.severity], ['Status', item.status], ['Description', item.description]
+      ]));
+    }
+    marker.addTo(markerLayer);
+    return marker;
+  }
+
+  function buildQuery() {
+    const params = new URLSearchParams();
+    if (categoryFilter.value) params.set('category', categoryFilter.value);
+    if (statusFilter.value) params.set('status', statusFilter.value);
+    if (regionFilter.value.trim()) params.set('region', regionFilter.value.trim());
+    if (viewportFilter.checked) {
+      const bounds = map.getBounds();
+      params.set('viewport', '1');
+      params.set('south', bounds.getSouth().toFixed(6));
+      params.set('west', bounds.getWest().toFixed(6));
+      params.set('north', bounds.getNorth().toFixed(6));
+      params.set('east', bounds.getEast().toFixed(6));
+    }
+    return params;
+  }
+
+  async function loadMapData() {
+    if (activeRequest) activeRequest.abort();
+    activeRequest = new AbortController();
+    mapStatus.textContent = 'Refreshing map data…';
+    try {
+      const query = buildQuery();
+      const response = await fetch(`${dataUrl}?${query.toString()}`, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' },
+        signal: activeRequest.signal
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || `Map request failed (${response.status})`);
+
+      markerLayer.clearLayers();
+      const markers = [];
+      payload.requests.forEach(item => markers.push(addMarker(item, 'request')));
+      payload.incidents.forEach(item => markers.push(addMarker(item, 'incident')));
+
+      if (!didFitMarkers && markers.length) {
+        map.fitBounds(L.featureGroup(markers).getBounds().pad(0.15), { maxZoom: 14 });
+        didFitMarkers = true;
+      }
+      const requestCount = payload.requests.length;
+      const incidentCount = payload.incidents.length;
+      mapStatus.textContent = `${requestCount} relief request marker(s) and ${incidentCount} incident marker(s) loaded.`;
+      lastRefreshed.textContent = new Date(payload.refreshed_at).toLocaleString();
+      const unmapped = payload.unmapped;
+      unmappedSummary.textContent = `${unmapped.requests_without_coordinates} relief request(s) have no complete coordinate pair; ${unmapped.storage_locations_without_coordinates} inventory storage location(s) and ${unmapped.volunteers_without_coordinates} volunteer profile(s) have no coordinate fields in the current data model.`;
+    } catch (error) {
+      if (error.name !== 'AbortError') mapStatus.textContent = `Unable to refresh map: ${error.message}`;
+    }
+  }
+
+  categoryFilter.addEventListener('change', loadMapData);
+  statusFilter.addEventListener('change', loadMapData);
+  regionFilter.addEventListener('input', () => {
+    window.clearTimeout(regionSearchTimer);
+    regionSearchTimer = window.setTimeout(loadMapData, 300);
+  });
+  viewportFilter.addEventListener('change', loadMapData);
+  document.getElementById('refreshMapButton').addEventListener('click', loadMapData);
+  document.getElementById('clearFiltersButton').addEventListener('click', () => {
+    categoryFilter.value = '';
+    statusFilter.value = '';
+    regionFilter.value = '';
+    viewportFilter.checked = false;
+    loadMapData();
+  });
+  map.on('moveend', () => {
+    if (viewportFilter.checked) loadMapData();
+  });
+
+  loadMapData();
+  window.setInterval(loadMapData, refreshIntervalMs);
+})();
+</script>
+{% endblock %}

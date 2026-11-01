@@ -4,6 +4,7 @@ from extensions import db
 from models import Assignment, ReliefRequest, User, Incident
 from auth import login_required, roles_required
 from audit import log_action
+from notifications import check_and_notify_critical_shortage
 from constants import (
     ROLE_ADMIN,
     ROLE_COORDINATOR,
@@ -168,6 +169,7 @@ def create_relief_request(
         entity_type="ReliefRequest",
         entity_id=req.request_id,
     )
+    check_and_notify_critical_shortage(category=category)
     return req
 
 

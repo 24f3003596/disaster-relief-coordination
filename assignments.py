@@ -5,7 +5,7 @@ from extensions import db
 from models import Assignment, ReliefRequest, InventoryItem, User, utc_now
 from auth import login_required, roles_required
 from audit import log_action
-from notifications import create_notification
+from notifications import create_notification, check_and_notify_critical_shortage
 from constants import (
     ROLE_VOLUNTEER,
     ASSIGNMENT_STATUSES,
@@ -124,6 +124,7 @@ def allocate_request(request_id, volunteer_id, item_id, quantity_assigned=None):
             message=f"Your request #{req.request_id} for {req.category} has been allocated to volunteer {volunteer.name}.",
             notification_type=NOTIFICATION_STATUS_UPDATE,
         )
+        check_and_notify_critical_shortage(category=item.category)
 
         # Audit log
         actor_id = None

@@ -1,14 +1,18 @@
 """Coordinator/Admin reporting endpoints for disaster relief operations."""
 from datetime import datetime, timezone
+import io
+import csv
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response
 from sqlalchemy import func
 
-from auth import roles_required
+from auth import login_required, roles_required
+from constants import ROLE_ADMIN
 from extensions import db
 from models import Assignment, Incident, InventoryItem, ReliefRequest
 
 reports_bp = Blueprint("reports", __name__)
+
 
 def generate_relief_report(start_date=None, end_date=None):
     """Generate relief report dictionary."""
@@ -26,6 +30,73 @@ def generate_relief_report(start_date=None, end_date=None):
         "inventory_units": int(inventory_quantity),
     }
 
+
+def generate_relief_requests_csv():
+    """
+    Generate CSV string for relief requests data (SRS FR 3.7.2).
+    Includes appropriate column headers and correctly formatted values.
+    """
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "request_id",
+        "user_id",
+        "category",
+        "quantity",
+        "urgency",
+        "location",
+        "latitude",
+        "longitude",
+        "incident_id",
+        "status",
+        "created_at",
+    ])
+    requests = ReliefRequest.query.order_by(ReliefRequest.request_id.asc()).all()
+    for req in requests:
+        writer.writerow([
+            req.request_id,
+            req.user_id,
+            req.category,
+            req.quantity,
+            req.urgency,
+            req.location,
+            req.latitude if req.latitude is not None else "",
+            req.longitude if req.longitude is not None else "",
+            req.incident_id if req.incident_id is not None else "",
+            req.status,
+            req.created_at.isoformat() + "Z" if req.created_at else "",
+        ])
+    return output.getvalue()
+
+
+def generate_inventory_csv():
+    """
+    Generate CSV string for inventory stock and threshold data (SRS FR 3.7.2).
+    Includes appropriate column headers and correctly formatted values.
+    """
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "item_id",
+        "category",
+        "quantity",
+        "storage_location",
+        "expiry_date",
+        "threshold",
+        "is_low_stock",
+    ])
+    items = InventoryItem.query.order_by(InventoryItem.item_id.asc()).all()
+    for item in items:
+        writer.writerow([
+            item.item_id,
+            item.category,
+            item.quantity,
+            item.storage_location,
+            item.expiry_date.isoformat() if item.expiry_date else "",
+            item.threshold,
+            "Yes" if item.is_low_stock() else "No",
+        ])
+    return output.getvalue()
 
 
 @reports_bp.get("/summary")
@@ -116,3 +187,26 @@ def relief_request_report():
             for row in rows
         ],
     }), 200
+
+
+@reports_bp.get("/export/relief-requests")
+@reports_bp.get("/export/requests")
+@login_required
+@roles_required(ROLE_ADMIN)
+def export_relief_requests_csv_route():
+    """Admin-only CSV export for relief requests (FR 3.7.2)."""
+    csv_data = generate_relief_requests_csv()
+    response = Response(csv_data, mimetype="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=relief_requests.csv"
+    return response
+
+
+@reports_bp.get("/export/inventory")
+@login_required
+@roles_required(ROLE_ADMIN)
+def export_inventory_csv_route():
+    """Admin-only CSV export for warehouse inventory (FR 3.7.2)."""
+    csv_data = generate_inventory_csv()
+    response = Response(csv_data, mimetype="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=inventory.csv"
+    return response
