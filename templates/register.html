@@ -1,24 +1,119 @@
 {% extends 'base.html' %}
+
 {% block content %}
+
 <div class="row justify-content-center py-4">
-  <div class="col-md-6">
-    <div class="card p-4 shadow-sm border-0">
-      <h3 class="fw-bold mb-3">Register User</h3>
-      {% if message %}<div class="alert alert-success">{{ message }}</div>{% endif %}
-      {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
-      <form method="post">
-        <label class="form-label fw-semibold">Name</label>
-        <input class="form-control mb-3" name="name" required placeholder="Full Name">
-        <label class="form-label fw-semibold">Phone</label>
-        <input class="form-control mb-3" name="phone" placeholder="Contact Phone">
-        <label class="form-label fw-semibold">Email</label>
-        <input class="form-control mb-3" name="email" type="email" required placeholder="name@example.com">
-        <label class="form-label fw-semibold">Password (8+ characters)</label>
-        <input class="form-control mb-3" name="password" type="password" required minlength="8" placeholder="Password">
-        <div class="form-text mb-3">New public accounts are registered as Victim. An administrator must assign any additional permissions.</div>
-        <button class="btn btn-primary w-100">Register</button>
-      </form>
+    <div class="col-md-6">
+
+        <div class="card p-4 shadow-sm border-0">
+
+            <h3 class="fw-bold mb-3">Register User</h3>
+
+            {% if message %}
+                <div class="alert alert-success">
+                    {{ message }}
+                </div>
+            {% endif %}
+
+            {% if error %}
+                <div class="alert alert-danger">
+                    {{ error }}
+                </div>
+            {% endif %}
+
+            {% if verification_email %}
+
+                {% if demo_otp %}
+                    <div class="alert alert-info">
+                        Demo OTP (development only):
+                        <strong>{{ demo_otp }}</strong>
+                    </div>
+                {% endif %}
+
+                <a
+                    class="btn btn-primary w-100"
+                    href="{{ url_for(
+                        'root_verify_phone',
+                        email=verification_email,
+                        phone=verification_phone
+                    ) }}"
+                >
+                    Continue to Phone Verification
+                </a>
+
+            {% else %}
+
+                <form method="POST" action="{{ url_for('root_register') }}">
+
+                    <label class="form-label fw-semibold">
+                        Name
+                    </label>
+
+                    <input
+                        class="form-control mb-3"
+                        type="text"
+                        name="name"
+                        required
+                        placeholder="Full Name"
+                    >
+
+                    <label class="form-label fw-semibold">
+                        Phone
+                    </label>
+
+                    <input
+                        class="form-control mb-3"
+                        type="tel"
+                        name="phone"
+                        required
+                        placeholder="Contact Phone"
+                    >
+
+                    <label class="form-label fw-semibold">
+                        Email
+                    </label>
+
+                    <input
+                        class="form-control mb-3"
+                        type="email"
+                        name="email"
+                        required
+                        placeholder="name@example.com"
+                    >
+
+                    <label class="form-label fw-semibold">
+                        Password (8+ characters)
+                    </label>
+
+                    <input
+                        class="form-control mb-3"
+                        type="password"
+                        name="password"
+                        required
+                        minlength="8"
+                        placeholder="Password"
+                    >
+
+                    <div class="form-text mb-3">
+                        Public accounts are registered as Victim
+                        and remain inactive until phone verification
+                        is completed.
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary w-100"
+                    >
+                        Register
+                    </button>
+
+                </form>
+
+            {% endif %}
+
+        </div>
+
     </div>
-  </div>
 </div>
+
 {% endblock %}
