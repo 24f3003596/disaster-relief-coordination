@@ -2,6 +2,8 @@
 {% block title %}Disaster Operations Map{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="">
 {% endblock %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
@@ -75,6 +77,7 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
 <script>
 (() => {
   const dataUrl = {{ url_for('map_view.map_data')|tojson }};
@@ -85,7 +88,18 @@
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
-  const markerLayer = L.layerGroup().addTo(map);
+  // Cluster nearby markers to keep dense disaster areas readable. If the
+  // optional plugin CDN is unavailable, retain a functional unclustered map.
+  const clusteringAvailable = typeof L.markerClusterGroup === 'function';
+  const markerLayer = clusteringAvailable
+    ? L.markerClusterGroup({
+        chunkedLoading: true,
+        showCoverageOnHover: false,
+        spiderfyOnMaxZoom: true,
+        removeOutsideVisibleBounds: true
+      })
+    : L.layerGroup();
+  markerLayer.addTo(map);
   const categoryFilter = document.getElementById('categoryFilter');
   const statusFilter = document.getElementById('statusFilter');
   const regionFilter = document.getElementById('regionFilter');
@@ -184,7 +198,10 @@
       }
       const requestCount = payload.requests.length;
       const incidentCount = payload.incidents.length;
-      mapStatus.textContent = `${requestCount} relief request marker(s) and ${incidentCount} incident marker(s) loaded.`;
+      const clusterNote = clusteringAvailable
+        ? ' Nearby markers are clustered; zoom in to inspect individual records.'
+        : ' Marker clustering is unavailable; showing individual markers.';
+      mapStatus.textContent = `${requestCount} relief request marker(s) and ${incidentCount} incident marker(s) loaded.${clusterNote}`;
       lastRefreshed.textContent = new Date(payload.refreshed_at).toLocaleString();
       const unmapped = payload.unmapped;
       unmappedSummary.textContent = `${unmapped.requests_without_coordinates} relief request(s) have no complete coordinate pair; ${unmapped.storage_locations_without_coordinates} inventory storage location(s) and ${unmapped.volunteers_without_coordinates} volunteer profile(s) have no coordinate fields in the current data model.`;

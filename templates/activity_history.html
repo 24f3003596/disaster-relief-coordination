@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-1">{{ title }}</h1>
+    <p class="text-muted mb-0">Chronological record of important changes and status transitions.</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ back_url }}">Back</a>
+</div>
+<section class="card shadow-sm" aria-label="Activity history for {{ entity_label }}">
+  <div class="card-body">
+    {% if activity %}
+      <ol class="list-group list-group-numbered list-group-flush">
+        {% for item in activity %}
+          <li class="list-group-item px-0">
+            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+              <strong>{{ item.action }}</strong>
+              <time class="text-muted small" datetime="{{ item.created_at }}">{{ item.created_at }}</time>
+            </div>
+            <div class="small text-muted mt-1">
+              Actor: {{ item.actor_name }}{% if item.user_id %} (user #{{ item.user_id }}){% endif %}
+              · Event #{{ item.log_id }}
+            </div>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p class="text-muted mb-0">No activity has been recorded for this item yet.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

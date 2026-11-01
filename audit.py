@@ -15,6 +15,8 @@ def log_action(user_id, action, entity_type=None, entity_id=None):
     action = (action or "").strip()
     if not action:
         raise ValueError("action is required")
+    if len(action) > 120:
+        action = action[:117] + "..."
 
     log_entry = AuditLog(
         user_id=user_id,
@@ -25,6 +27,35 @@ def log_action(user_id, action, entity_type=None, entity_id=None):
     db.session.add(log_entry)
     db.session.commit()
     return log_entry
+
+def list_entity_activity(entity_type, entity_id):
+    """Return an entity's activity in chronological order, including actor names.
+
+    The existing AuditLog table is reused so existing installations do not need
+    a schema migration. New events put concise, human-readable change details
+    into the existing action field.
+    """
+    entity_type = (entity_type or "").strip()
+    if not entity_type:
+        raise ValueError("entity_type is required")
+    try:
+        entity_id = int(entity_id)
+    except (TypeError, ValueError):
+        raise ValueError("entity_id must be an integer")
+
+    entries = (
+        AuditLog.query
+        .filter_by(entity_type=entity_type, entity_id=entity_id)
+        .order_by(AuditLog.created_at.asc(), AuditLog.log_id.asc())
+        .all()
+    )
+    activity = []
+    for entry in entries:
+        item = entry.to_dict()
+        item["actor_name"] = entry.user.name if entry.user else "System"
+        activity.append(item)
+    return activity
+
 
 def list_audit_logs(start_date=None, end_date=None):
     """Retrieve audit logs ordered by date descending."""

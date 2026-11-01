@@ -176,3 +176,16 @@ def test_map_data_defaults_to_active_requests_and_incidents(app, client):
     assert [item["location"] for item in completed["requests"]] == ["Completed request"]
     closed = client.get("/map/data?status=Closed").get_json()
     assert [item["title"] for item in closed["incidents"]] == ["Closed incident"]
+
+
+def test_map_page_loads_marker_clustering_assets_and_fallback(app, client):
+    coordinator_id = make_user(app, "map-cluster-coordinator", "Coordinator")
+    login(client, coordinator_id)
+    response = client.get("/map/")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "leaflet.markercluster@1.5.3/dist/MarkerCluster.css" in html
+    assert "leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" in html
+    assert "leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" in html
+    assert "L.markerClusterGroup" in html
+    assert "Marker clustering is unavailable" in html

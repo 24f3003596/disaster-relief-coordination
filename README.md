@@ -191,6 +191,14 @@ radon cc . -s -a
 
 ---
 
+
+## Sprint 5 — Request/Incident Activity History and Map Clustering
+
+- Relief requests expose a role-checked chronological activity view at `/requests/<request_id>/history`; victims can view their own requests, volunteers can view requests assigned to them, and Coordinators/Admins can view operational requests. Use `?format=json` for the JSON representation.
+- Incidents expose a Coordinator/Admin-only activity view at `/incidents/<incident_id>/history`, also supporting `?format=json`.
+- New activity records identify the acting user and record request creation, request status transitions (including transitions caused by allocation/assignment), incident creation, changed incident fields and incident status transitions. The existing `audit_logs` table is reused; no schema migration is required. Existing historical audit rows remain available, though older generic events do not contain field-level detail.
+- The map uses Leaflet.markercluster to group nearby markers. If the optional clustering CDN resource is unavailable, the map gracefully falls back to individual markers. Existing filters and 30-second refresh behavior remain in place.
+
 ## 🔄 Git Branching & Merge History
 
 All team feature branches were developed on dedicated branch tracks and merged into `main` preserving commit authorship:
