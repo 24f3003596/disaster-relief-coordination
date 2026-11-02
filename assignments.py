@@ -108,6 +108,7 @@ def allocate_request(request_id, volunteer_id, item_id, quantity_assigned=None):
             db.session.add(assignment)
 
         # Atomic stock deduction and status transition
+        previous_request_status = req.status
         item.quantity -= alloc_qty
         req.status = STATUS_REQUEST_ASSIGNED
 
@@ -136,6 +137,13 @@ def allocate_request(request_id, volunteer_id, item_id, quantity_assigned=None):
             entity_type="Assignment",
             entity_id=assignment.task_id,
         )
+        if previous_request_status != req.status:
+            log_action(
+                user_id=actor_id,
+                action=f"Request status changed: {previous_request_status} -> {req.status} (allocation)",
+                entity_type="ReliefRequest",
+                entity_id=req.request_id,
+            )
 
         db.session.commit()
         return assignment
@@ -174,6 +182,9 @@ def update_assignment_status(task_id, new_status):
         raise ValueError(f"Cannot change status of an assignment that is already {assignment.status}")
 
     old_status = assignment.status
+    previous_request_status = (
+        assignment.relief_request.status if assignment.relief_request else None
+    )
     assignment.status = new_status
 
     if new_status == STATUS_ASSIGNMENT_COMPLETED:
@@ -218,10 +229,23 @@ def update_assignment_status(task_id, new_status):
 
     log_action(
         user_id=actor_id,
-        action=action_label,
+        action=f"{action_label}: {old_status} -> {new_status}",
         entity_type="Assignment",
         entity_id=assignment.task_id,
     )
+    current_request_status = (
+        assignment.relief_request.status if assignment.relief_request else None
+    )
+    if (
+        assignment.relief_request
+        and previous_request_status != current_request_status
+    ):
+        log_action(
+            user_id=actor_id,
+            action=f"Request status changed: {previous_request_status} -> {current_request_status} (assignment)",
+            entity_type="ReliefRequest",
+            entity_id=assignment.request_id,
+        )
 
     db.session.commit()
     return assignment

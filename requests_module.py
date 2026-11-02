@@ -3,7 +3,7 @@ from flask import Blueprint, jsonify, request, session, render_template
 from extensions import db
 from models import Assignment, ReliefRequest, User, Incident
 from auth import login_required, roles_required
-from audit import log_action
+from audit import log_action, list_entity_activity
 from notifications import check_and_notify_critical_shortage
 from constants import (
     ROLE_ADMIN,
@@ -20,8 +20,6 @@ from constants import (
     STATUS_REQUEST_FULFILLED,
     STATUS_REQUEST_COMPLETED,
     STATUS_REQUEST_CANCELLED,
-    ACTION_CREATE_REQUEST,
-    ACTION_UPDATE_REQUEST_STATUS,
 )
 
 requests_bp = Blueprint("requests_module", __name__)
@@ -69,6 +67,7 @@ def create_relief_request(
     longitude=None,
     incident_id=None,
     location=None,
+    actor_id=None,
 ):
     """Validate and persist a relief request for an existing user."""
     try:
@@ -164,8 +163,11 @@ def create_relief_request(
     db.session.commit()
 
     log_action(
-        user_id=user_id,
-        action=ACTION_CREATE_REQUEST,
+        user_id=actor_id if actor_id is not None else user_id,
+        action=(
+            f"Created relief request: {category[:45]}, quantity {quantity}, "
+            f"urgency {urgency}"
+        ),
         entity_type="ReliefRequest",
         entity_id=req.request_id,
     )
@@ -204,11 +206,12 @@ def update_request_status(request_id, new_status, actor_id=None):
             f"Invalid request status transition: {req.status} -> {new_status}"
         )
 
+    previous_status = req.status
     req.status = new_status
     db.session.commit()
     log_action(
         user_id=actor_id,
-        action=ACTION_UPDATE_REQUEST_STATUS,
+        action=f"Request status changed: {previous_status} -> {new_status}",
         entity_type="ReliefRequest",
         entity_id=req.request_id,
     )
@@ -285,6 +288,7 @@ def create_request_route():
             longitude=(data.get("longitude") if data.get("longitude") not in (None, "") else None),
             incident_id=data.get("incident_id") or None,
             location=data.get("location"),
+            actor_id=current_user.user_id,
         )
         if request.is_json or request.headers.get("Accept") == "application/json":
             return jsonify({"message": "Relief request submitted", "request": req.to_dict()}), 201
@@ -351,6 +355,36 @@ def get_request_route(request_id):
     if not _can_view_request(current_user, req):
         return jsonify({"error": "Insufficient permissions"}), 403
     return jsonify({"request": req.to_dict()}), 200
+
+
+@requests_bp.get("/<int:request_id>/history")
+@login_required
+def request_history_route(request_id):
+    """Show chronological activity for a request to users allowed to view it."""
+    current_user = db.session.get(User, session.get("user_id"))
+    req = db.session.get(ReliefRequest, request_id)
+    if current_user is None:
+        session.clear()
+        return jsonify({"error": "Authentication required"}), 401
+    if req is None:
+        return jsonify({"error": "Relief request not found"}), 404
+    if not _can_view_request(current_user, req):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    activity = list_entity_activity("ReliefRequest", request_id)
+    if request.args.get("format") == "json" or (
+        request.accept_mimetypes.best == "application/json"
+        and request.accept_mimetypes["application/json"] > request.accept_mimetypes["text/html"]
+    ):
+        return jsonify({"request_id": request_id, "activity": activity}), 200
+
+    return render_template(
+        "activity_history.html",
+        title=f"Relief Request #{request_id} Activity",
+        entity_label=f"Relief Request #{request_id}",
+        activity=activity,
+        back_url="/requests/",
+    ), 200
 
 
 @requests_bp.patch("/<int:request_id>/status")

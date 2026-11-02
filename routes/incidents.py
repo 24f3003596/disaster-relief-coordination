@@ -1,9 +1,9 @@
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request, session, render_template
 
 from extensions import db
 from models import Incident
 from auth import login_required, roles_required
-from audit import log_action
+from audit import log_action, list_entity_activity
 from constants import (
     VALID_SEVERITIES,
     VALID_INCIDENT_STATUSES,
@@ -12,9 +12,6 @@ from constants import (
     STATUS_INCIDENT_MONITORING,
     STATUS_INCIDENT_RESOLVED,
     STATUS_INCIDENT_CLOSED,
-    ACTION_CREATE_INCIDENT,
-    ACTION_UPDATE_INCIDENT,
-    ACTION_UPDATE_INCIDENT_STATUS,
 )
 
 incidents_bp = Blueprint("incidents", __name__)
@@ -69,7 +66,7 @@ def create_incident(title, description, latitude, longitude, severity, reported_
     db.session.commit()
     log_action(
         user_id=reported_by,
-        action=ACTION_CREATE_INCIDENT,
+        action=f"Created incident: {title[:80]} ({severity})",
         entity_type="Incident",
         entity_id=incident.incident_id,
     )
@@ -127,15 +124,37 @@ def update_incident(incident_id, updates, actor_id=None):
     longitude = updates.get("longitude", incident.longitude)
     latitude, longitude = _validated_coordinates(latitude, longitude)
 
+    changed_values = {
+        "title": (incident.title, title),
+        "description": (incident.description, description),
+        "severity": (incident.severity, severity),
+        "latitude": (incident.latitude, latitude),
+        "longitude": (incident.longitude, longitude),
+    }
+    changes = [
+        (field, old, new)
+        for field, (old, new) in changed_values.items()
+        if old != new
+    ]
+    if not changes:
+        return incident
+
     incident.title = title
     incident.description = description
     incident.severity = severity
     incident.latitude = latitude
     incident.longitude = longitude
     db.session.commit()
+
+    # Keep the audit entry concise enough for the existing 120-character
+    # AuditLog.action column while retaining the fields and value changes.
+    change_summary = "; ".join(
+        f"{field}: {str(old)[:18]} -> {str(new)[:18]}"
+        for field, old, new in changes
+    )
     log_action(
         user_id=actor_id,
-        action=ACTION_UPDATE_INCIDENT,
+        action=f"Incident updated: {change_summary}"[:120],
         entity_type="Incident",
         entity_id=incident.incident_id,
     )
@@ -156,11 +175,12 @@ def update_incident_status(incident_id, new_status, actor_id=None):
         raise ValueError(
             f"Invalid incident status transition: {incident.status} -> {new_status}"
         )
+    previous_status = incident.status
     incident.status = new_status
     db.session.commit()
     log_action(
         user_id=actor_id,
-        action=ACTION_UPDATE_INCIDENT_STATUS,
+        action=f"Incident status changed: {previous_status} -> {new_status}",
         entity_type="Incident",
         entity_id=incident.incident_id,
     )
@@ -271,6 +291,31 @@ def update_incident_status_route(incident_id):
         db.session.rollback()
         status_code = 404 if str(exc) == "Incident not found" else 400
         return jsonify({"error": str(exc)}), status_code
+
+
+@incidents_bp.get("/<int:incident_id>/history")
+@login_required
+@roles_required("Coordinator", "Admin")
+def incident_history_route(incident_id):
+    """Show chronological activity for an incident to operational roles."""
+    incident = db.session.get(Incident, incident_id)
+    if incident is None:
+        return jsonify({"error": "Incident not found"}), 404
+
+    activity = list_entity_activity("Incident", incident_id)
+    if request.args.get("format") == "json" or (
+        request.accept_mimetypes.best == "application/json"
+        and request.accept_mimetypes["application/json"] > request.accept_mimetypes["text/html"]
+    ):
+        return jsonify({"incident_id": incident_id, "activity": activity}), 200
+
+    return render_template(
+        "activity_history.html",
+        title=f"Incident #{incident_id} Activity",
+        entity_label=f"Incident #{incident_id}: {incident.title}",
+        activity=activity,
+        back_url="/incidents",
+    ), 200
 
 
 @incidents_bp.get("/affected-areas")
