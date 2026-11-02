@@ -110,3 +110,4 @@ tests/test_inventory_resource_consistency.py::test_full_allocation_and_delivery_
 
 ============================= 19 passed in 29.30s =============================
 ```
+
