@@ -1,7 +1,10 @@
 from flask import Blueprint, jsonify, request, session
 
 from extensions import db
-from models import Notification, User, InventoryItem, ReliefRequest
+from models import (
+    Notification, User, InventoryItem, ReliefRequest,
+    InventoryShortageState,
+)
 from auth import login_required, roles_required
 from constants import (
     VALID_NOTIFICATION_TYPES,
@@ -86,96 +89,138 @@ def broadcast_emergency_alert(message, notification_type=NOTIFICATION_EMERGENCY,
 
 
 def check_and_notify_critical_shortage(category=None, item_id=None):
-    """
-    Automate critical-shortage notifications (SRS FR 3.6.2).
-    
-    When inventory for a resource category falls below or at its configured
-    threshold while pending requests for that category exist, notify the
-    relevant Coordinators and Admins through the in-app notification system.
+    """Create one alert per active category-shortage episode.
 
-    Acceptance Criteria Enforced:
-    1. Threshold Checks: Checked on inventory creation, manual stock adjustments,
-       request allocations, and new pending request creation.
-    2. Shortage Notification: Triggered when category stock <= threshold AND pending requests > 0.
-    3. No Unmatched Alerts: Shortages without matching pending requests do NOT generate request alerts.
-    4. Access Control / Authorized Recipients: Only Coordinators and Admins receive alerts (Victims/Volunteers excluded).
-    5. Deduplication: Repeated operations do not generate duplicate unread alerts for the same shortage condition.
+    A shortage episode starts when category stock is at/below the configured
+    threshold (or an individual storage record is at/below its own threshold)
+    AND at least one matching relief request is pending. Repeated checks do
+    not create duplicate alerts, even if an earlier alert has been read.
+    A recovery above threshold or the absence of pending demand closes the
+    episode; a later shortage can then generate a fresh alert.
+
+    This function flushes changes but deliberately does not commit. Callers
+    commit it together with the inventory/request operation that triggered it.
     """
     target_categories = set()
     if item_id is not None:
         item = db.session.get(InventoryItem, item_id)
         if item and item.category:
-            target_categories.add(item.category)
+            target_categories.add(item.category.strip())
     elif category:
-        target_categories.add(category.strip())
+        normalized_category = str(category).strip()
+        if normalized_category:
+            target_categories.add(normalized_category)
     else:
-        # Check all categories present in warehouse inventory
-        cats = db.session.query(InventoryItem.category).distinct().all()
-        target_categories = {c[0] for c in cats if c[0]}
+        categories = db.session.query(InventoryItem.category).distinct().all()
+        target_categories = {
+            str(row[0]).strip() for row in categories if row[0] and str(row[0]).strip()
+        }
 
     if not target_categories:
         return []
 
     created_alerts = []
+    # Collapse case-only duplicates while preserving a readable category label.
+    categories_by_key = {}
+    for label in sorted(target_categories, key=str.casefold):
+        categories_by_key.setdefault(label.casefold(), label)
 
-    for cat in target_categories:
-        items = InventoryItem.query.filter(InventoryItem.category.ilike(cat)).all()
+    for category_key, category_label in categories_by_key.items():
+        items = (
+            InventoryItem.query
+            .filter(InventoryItem.category.ilike(category_label))
+            .order_by(InventoryItem.item_id.asc())
+            .all()
+        )
+        state = db.session.get(InventoryShortageState, category_key)
+
         if not items:
+            if state and state.is_active:
+                state.is_active = False
+                state.available_stock = 0
+                state.configured_threshold = 0
+                state.pending_request_count = 0
             continue
 
-        total_stock = sum(i.quantity for i in items)
-        total_threshold = sum(i.threshold for i in items)
+        total_stock = sum(max(0, int(item.quantity or 0)) for item in items)
+        total_threshold = sum(max(0, int(item.threshold or 0)) for item in items)
+        low_stock_item_count = sum(1 for item in items if item.is_low_stock())
+        is_stock_shortage = (
+            total_stock <= total_threshold or low_stock_item_count > 0
+        )
 
-        # Category is in shortage if total available stock <= total threshold
-        # or any item in the category has reached low stock
-        is_shortage = (total_stock <= total_threshold) or any(i.is_low_stock() for i in items)
-        if not is_shortage:
-            # Stock is strictly above threshold; no shortage condition
-            continue
-
-        # Check for matching pending relief requests (AC3)
-        pending_requests = ReliefRequest.query.filter(
-            ReliefRequest.category.ilike(cat),
+        pending_count = ReliefRequest.query.filter(
+            ReliefRequest.category.ilike(category_label),
             ReliefRequest.status == STATUS_REQUEST_PENDING,
-        ).all()
-        pending_count = len(pending_requests)
-        if pending_count == 0:
-            # AC3: Shortages without matching pending requests do not generate request-related alerts
+        ).count()
+
+        shortage_is_active = is_stock_shortage and pending_count > 0
+
+        if not shortage_is_active:
+            # Remember recovery so a future shortage becomes a new episode.
+            if state and state.is_active:
+                state.is_active = False
+            if state:
+                state.available_stock = total_stock
+                state.configured_threshold = total_threshold
+                state.pending_request_count = pending_count
             continue
 
-        # Recipients: Coordinators and Admins only (AC4)
-        recipients = User.query.filter(
-            User.role.in_([ROLE_COORDINATOR, ROLE_ADMIN])
-        ).all()
-        if not recipients:
+        if state and state.is_active:
+            # Same uninterrupted shortage: update diagnostic values, but do
+            # not send another notification (even if the earlier one was read).
+            state.available_stock = total_stock
+            state.configured_threshold = total_threshold
+            state.pending_request_count = pending_count
             continue
 
-        # Deduplication (AC5): Do not send duplicate alert if an unread alert for this category already exists
-        for recipient in recipients:
-            existing = Notification.query.filter(
-                Notification.user_id == recipient.user_id,
-                Notification.type == NOTIFICATION_CRITICAL_SHORTAGE,
-                Notification.is_read.is_(False),
-                Notification.message.like(f"%'{cat}'%"),
-            ).first()
-            if existing:
-                continue
-
-            alert_msg = (
-                f"CRITICAL SHORTAGE ALERT: Resource category '{cat}' stock is at or below threshold "
-                f"({total_stock} units available, threshold {total_threshold}) "
-                f"with {pending_count} pending request(s) awaiting fulfillment."
+        recipients = (
+            User.query
+            .filter(
+                User.role.in_([ROLE_COORDINATOR, ROLE_ADMIN]),
+                User.is_active.is_(True),
+                User.phone_verified.is_(True),
+                User.approval_status == "approved",
             )
-            notif = Notification(
+            .order_by(User.user_id.asc())
+            .all()
+        )
+        if not recipients:
+            # Do not mark the episode active until at least one eligible
+            # recipient can actually receive the alert.
+            continue
+
+        if state is None:
+            state = InventoryShortageState(category_key=category_key)
+            db.session.add(state)
+
+        reason = (
+            f"{low_stock_item_count} inventory item(s) at/below their own "
+            f"threshold; category total {total_stock} units, combined "
+            f"threshold {total_threshold} units"
+        )
+        message = (
+            f"CRITICAL SHORTAGE ALERT: Resource category '{category_label}' "
+            f"requires attention ({reason}) with {pending_count} pending "
+            f"request(s) awaiting fulfillment."
+        )
+
+        for recipient in recipients:
+            notification = Notification(
                 user_id=recipient.user_id,
-                message=alert_msg,
+                message=message,
                 type=NOTIFICATION_CRITICAL_SHORTAGE,
                 is_read=False,
             )
-            db.session.add(notif)
-            created_alerts.append(notif)
+            db.session.add(notification)
+            created_alerts.append(notification)
 
-    if created_alerts:
+        state.is_active = True
+        state.available_stock = total_stock
+        state.configured_threshold = total_threshold
+        state.pending_request_count = pending_count
+
+    if created_alerts or target_categories:
         db.session.flush()
 
     return created_alerts
@@ -184,14 +229,16 @@ def check_and_notify_critical_shortage(category=None, item_id=None):
 @notifications_bp.get("/")
 def get_user_notifications():
     user_id = session.get("user_id")
+    # Preserve an empty response for anonymous page loads, but never expose
+    # system-wide or other users' private notifications.
     if not user_id:
-        notifs = Notification.query.order_by(Notification.created_at.desc()).all()
-    else:
-        notifs = list_notifications(user_id)
+        return jsonify({"notifications": []}), 200
+    notifs = list_notifications(user_id)
     return jsonify({"notifications": [n.to_dict() for n in notifs]}), 200
 
 
 @notifications_bp.patch("/<int:notification_id>/read")
+@login_required
 def read_notification_route(notification_id):
     user_id = session.get("user_id")
     try:
@@ -202,6 +249,8 @@ def read_notification_route(notification_id):
 
 
 @notifications_bp.post("/broadcast")
+@login_required
+@roles_required(ROLE_COORDINATOR, ROLE_ADMIN)
 def broadcast_route():
     data = request.get_json(silent=True) or request.form or {}
     message = data.get("message")

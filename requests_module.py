@@ -172,6 +172,8 @@ def create_relief_request(
         entity_id=req.request_id,
     )
     check_and_notify_critical_shortage(category=category)
+    # Persist shortage state and generated notifications with this request.
+    db.session.commit()
     return req
 
 

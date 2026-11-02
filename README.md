@@ -338,3 +338,17 @@ Rejected accounts remain blocked. A later role change by an Admin resets the app
 ### Database update
 
 The application creates the new OTP table and applies additive columns to the existing `users` table at startup. Back up `disaster_relief.db` before deploying the update.
+
+## Sprint 6: Dashboard Analytics and Critical-Shortage Notifications
+
+Sprint 6 hardens the operational analytics and shortage-alert features:
+- Coordinator/Admin-only dashboard analytics.
+- Admin-only CSV exports for relief requests and inventory.
+- Spreadsheet-formula-safe CSV text values and secure download headers.
+- Automated shortage notifications for matching pending relief requests.
+- Persisted shortage-episode state to prevent duplicate alerts until recovery.
+- Notifications restricted to active, verified and approved Coordinators/Admins.
+- Authenticated, owner-scoped notification retrieval and protected broadcast operations.
+
+See `docs/SPRINT6_DASHBOARD_AND_SHORTAGE_IMPLEMENTATION.md` for implementation details and test instructions.
+

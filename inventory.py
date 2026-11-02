@@ -70,6 +70,8 @@ def create_inventory_item(category, quantity, storage_location, expiry_date=None
         entity_id=item.item_id,
     )
     check_and_notify_critical_shortage(category=item.category)
+    # Persist shortage state and generated notifications with this operation.
+    db.session.commit()
     return item
 
 def list_inventory_items(category=None, available_only=False):
@@ -101,6 +103,8 @@ def update_inventory_stock(item_id, quantity_change, actor_id=None):
         entity_id=item.item_id,
     )
     check_and_notify_critical_shortage(category=item.category)
+    # Persist shortage state and generated notifications with this operation.
+    db.session.commit()
     return item
 
 @inventory_bp.post("/")

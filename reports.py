@@ -10,6 +10,7 @@ from auth import login_required, roles_required
 from constants import ROLE_ADMIN
 from extensions import db
 from models import Assignment, Incident, InventoryItem, ReliefRequest
+from csv_safety import safe_csv_text
 
 reports_bp = Blueprint("reports", __name__)
 
@@ -56,10 +57,10 @@ def generate_relief_requests_csv():
         writer.writerow([
             req.request_id,
             req.user_id,
-            req.category,
+            safe_csv_text(req.category),
             req.quantity,
             req.urgency,
-            req.location,
+            safe_csv_text(req.location),
             req.latitude if req.latitude is not None else "",
             req.longitude if req.longitude is not None else "",
             req.incident_id if req.incident_id is not None else "",
@@ -89,9 +90,9 @@ def generate_inventory_csv():
     for item in items:
         writer.writerow([
             item.item_id,
-            item.category,
+            safe_csv_text(item.category),
             item.quantity,
-            item.storage_location,
+            safe_csv_text(item.storage_location),
             item.expiry_date.isoformat() if item.expiry_date else "",
             item.threshold,
             "Yes" if item.is_low_stock() else "No",
@@ -198,6 +199,8 @@ def export_relief_requests_csv_route():
     csv_data = generate_relief_requests_csv()
     response = Response(csv_data, mimetype="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=relief_requests.csv"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
     return response
 
 
@@ -209,4 +212,6 @@ def export_inventory_csv_route():
     csv_data = generate_inventory_csv()
     response = Response(csv_data, mimetype="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=inventory.csv"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
     return response

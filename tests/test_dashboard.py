@@ -42,7 +42,22 @@ def test_dashboard_summary_metrics(app):
         assert summary["incidents"]["active_count"] == 1
         assert summary["volunteers"]["total_count"] == 1
 
-def test_dashboard_routes(client):
+def test_dashboard_routes(client, app):
+    # Dashboard analytics are available to authenticated Coordinators/Admins.
+    with app.app_context():
+        coordinator = User(
+            name="Dashboard Coordinator",
+            email="dashboard-coordinator@example.com",
+            role=ROLE_COORDINATOR,
+            password_hash=generate_password_hash("DashboardPass123"),
+        )
+        db.session.add(coordinator)
+        db.session.commit()
+        coordinator_id = coordinator.user_id
+
+    with client.session_transaction() as session:
+        session["user_id"] = coordinator_id
+
     # API Summary JSON endpoint
     res = client.get("/dashboard/summary")
     assert res.status_code == 200
