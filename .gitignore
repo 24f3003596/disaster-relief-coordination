@@ -1,11 +1,40 @@
+
+# Python cache files
 __pycache__/
 *.py[cod]
+*.pyo
+
+# Pytest
 .pytest_cache/
 .coverage
 htmlcov/
+test-results.xml
+
+# Virtual environments
 .venv/
 .venv*/
 venv/
+env/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# SQLite database files
 instance/
 *.db
-.env
+*.sqlite
+*.sqlite3
+
+# Database backups and recovery test files
+backups/
+restore_test/
+
+# IDE files
+.vscode/
+.idea/
+
+# Operating system files
+.DS_Store
+Thumbs.db
