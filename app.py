@@ -1,5 +1,6 @@
 import os
 
+from dotenv import load_dotenv
 from datetime import datetime
 from werkzeug.security import check_password_hash
 
@@ -58,20 +59,68 @@ from models import (
 from map_view import map_bp
 
 
+# Load environment variables from the project .env file.
+load_dotenv()
+
+
 def create_app(test_config=None):
     app = Flask(__name__)
     app.url_map.strict_slashes = False
 
+    # ---------------------------------------------------------
+    # ENVIRONMENT CONFIGURATION
+    # ---------------------------------------------------------
+
+    environment = os.getenv(
+        "APP_ENV",
+        "development"
+    ).strip().lower()
+
+    secret_key = os.getenv("SECRET_KEY")
+
+    if not secret_key:
+        if environment == "production":
+            raise RuntimeError(
+                "SECRET_KEY must be configured when APP_ENV=production."
+            )
+
+        secret_key = "development-only-change-this-secret"
+
+    # Flask-SQLAlchemy stores relative SQLite databases
+    # inside Flask's instance directory.
+    database_url = os.getenv(
+        "DATABASE_URL",
+        "sqlite:///disaster_relief.db",
+    ).strip()
+
+    try:
+        otp_ttl_minutes = int(
+            os.getenv("OTP_TTL_MINUTES", "5")
+        )
+    except ValueError as exc:
+        raise RuntimeError(
+            "OTP_TTL_MINUTES must be a positive integer."
+        ) from exc
+
+    if otp_ttl_minutes <= 0:
+        raise RuntimeError(
+            "OTP_TTL_MINUTES must be a positive integer."
+        )
+
     app.config.update(
-        SECRET_KEY="disaster-relief-secret-key-review2",
-        SQLALCHEMY_DATABASE_URI="sqlite:///disaster_relief.db",
+        SECRET_KEY=secret_key,
+        SQLALCHEMY_DATABASE_URI=database_url,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
-        OTP_TTL_MINUTES=5,
+        OTP_TTL_MINUTES=otp_ttl_minutes,
         OTP_DEMO_MODE=os.getenv("OTP_DEMO_MODE", "0") == "1",
     )
 
+    # Preserve test-specific configuration used by pytest.
     if test_config:
         app.config.update(test_config)
+
+    # Create the instance directory before SQLite connects.
+    os.makedirs(app.instance_path, exist_ok=True)
 
     db.init_app(app)
 
@@ -134,7 +183,10 @@ def create_app(test_config=None):
                 "relief_requests": "GET/POST /requests/",
                 "assignments": "GET/POST /assignments/",
                 "incidents": "GET/POST /incidents/",
-                "operations_map": "GET /map/ (Coordinator/Admin); GET /map/data (filtered map markers)",
+                "operations_map": (
+                    "GET /map/ (Coordinator/Admin); "
+                    "GET /map/data (filtered map markers)"
+                ),
                 "reports": "GET /reports/summary",
             },
         })
@@ -357,7 +409,6 @@ def create_app(test_config=None):
         )
 
         return redirect(url_for("root_login"))
-
     # ---------------------------------------------------------
     # ASSIGNMENTS
     # ---------------------------------------------------------
@@ -670,8 +721,6 @@ def create_app(test_config=None):
         db.session.commit()
 
     return app
-
-
 # =============================================================
 # INITIAL DEMONSTRATION DATA
 # =============================================================
