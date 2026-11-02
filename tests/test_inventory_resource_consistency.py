@@ -1,4 +1,14 @@
+"""Comprehensive Inventory and Resource Consistency Verification Suite.
+
+Validates atomic stock deduction, rollback safety, idempotency guards,
+expiry date checks, approval requirements, and mathematical consistency
+across relief allocations, volunteer dispatches, and warehouse operations.
+"""
+
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 import pytest
+
 from extensions import db
 from models import Assignment, InventoryItem, ReliefRequest, Notification, AuditLog, User
 from assignments import allocate_request, update_assignment_status, complete_assignment
@@ -9,6 +19,7 @@ from constants import (
     STATUS_REQUEST_PENDING,
     STATUS_REQUEST_ASSIGNED,
     STATUS_REQUEST_FULFILLED,
+    STATUS_REQUEST_CANCELLED,
     STATUS_ASSIGNMENT_ASSIGNED,
     STATUS_ASSIGNMENT_ACCEPTED,
     STATUS_ASSIGNMENT_IN_PROGRESS,
@@ -52,7 +63,6 @@ def test_successful_allocation_updates_all_records_atomically(app, seed):
 def test_allocation_rejects_category_mismatch_without_data_corruption(app, seed):
     """AC2: Failed allocations do not leave inconsistent data (incompatible category)."""
     with app.app_context():
-        # Create an inventory item with a different category
         med_item = create_inventory_item(
             category=CATEGORY_MEDICAL,
             quantity=50,
@@ -196,7 +206,7 @@ def test_repeated_allocation_call_does_not_duplicate_or_leak_stock(app, seed):
         initial_stock = db.session.get(InventoryItem, seed["item"]).quantity
 
         # First allocation
-        a1 = allocate_request(seed["request"], seed["volunteer"], seed["item"])
+        allocate_request(seed["request"], seed["volunteer"], seed["item"])
         stock_after_first = db.session.get(InventoryItem, seed["item"]).quantity
         assert stock_after_first == initial_stock - 4
 
@@ -316,3 +326,149 @@ def test_allocate_route_missing_parameters_returns_400_without_state_change(app,
         # Stock untouched across all bad API calls
         assert db.session.get(InventoryItem, seed["item"]).quantity == stock_before
         assert Assignment.query.count() == 0
+
+
+# ---------------------------------------------------------------------------
+# Sprint 6 New Consistency & Transaction Safety Validations
+# ---------------------------------------------------------------------------
+
+def test_expired_inventory_cannot_be_allocated(app, seed):
+    """AC3 & AC6: Expired inventory items are rejected from allocation without stock change."""
+    with app.app_context():
+        expired_date = datetime.now(timezone.utc) - timedelta(days=3)
+        expired_item = create_inventory_item(
+            category=CATEGORY_FOOD_WATER,
+            quantity=30,
+            storage_location="Depot Expired Shelf",
+            expiry_date=expired_date.strftime("%Y-%m-%d"),
+            threshold=5,
+        )
+        initial_stock = expired_item.quantity
+        exp_id = expired_item.item_id
+
+        with pytest.raises(ValueError, match="Cannot allocate expired inventory"):
+            allocate_request(seed["request"], seed["volunteer"], exp_id)
+
+        # Stock untouched and request remains pending
+        assert db.session.get(InventoryItem, exp_id).quantity == initial_stock
+        assert db.session.get(ReliefRequest, seed["request"]).status == STATUS_REQUEST_PENDING
+        assert Assignment.query.filter_by(item_id=exp_id).count() == 0
+
+
+def test_unapproved_or_inactive_volunteer_rejected_from_allocation(app, seed):
+    """AC2: Unapproved or deactivated volunteer accounts cannot receive dispatched allocations."""
+    with app.app_context():
+        initial_stock = db.session.get(InventoryItem, seed["item"]).quantity
+        pending_vol = User(
+            name="Pending Vol",
+            email="pending-vol@example.com",
+            role=ROLE_VOLUNTEER,
+            password_hash="hash",
+            approval_status="pending",
+            is_active=True,
+        )
+        inactive_vol = User(
+            name="Inactive Vol",
+            email="inactive-vol@example.com",
+            role=ROLE_VOLUNTEER,
+            password_hash="hash",
+            approval_status="approved",
+            is_active=False,
+        )
+        db.session.add_all([pending_vol, inactive_vol])
+        db.session.commit()
+        p_id, inact_id = pending_vol.user_id, inactive_vol.user_id
+
+        # Attempt allocation with pending volunteer
+        with pytest.raises(ValueError, match="active and approved"):
+            allocate_request(seed["request"], p_id, seed["item"])
+
+        # Attempt allocation with deactivated volunteer
+        with pytest.raises(ValueError, match="active and approved"):
+            allocate_request(seed["request"], inact_id, seed["item"])
+
+        # Invariant checks: stock unaffected, request remains pending
+        assert db.session.get(InventoryItem, seed["item"]).quantity == initial_stock
+        assert db.session.get(ReliefRequest, seed["request"]).status == STATUS_REQUEST_PENDING
+        assert Assignment.query.count() == 0
+
+
+def test_allocation_atomic_rollback_on_database_commit_failure(app, seed):
+    """AC3 & AC7: Mid-transaction failure rolls back all records; no partial updates persist."""
+    with app.app_context():
+        initial_stock = db.session.get(InventoryItem, seed["item"]).quantity
+        req_id = seed["request"]
+        item_id = seed["item"]
+        vol_id = seed["volunteer"]
+
+        # Simulate unexpected database commit failure
+        with patch.object(db.session, "commit", side_effect=RuntimeError("Simulated DB connection drop")):
+            with pytest.raises(RuntimeError, match="Simulated DB connection drop"):
+                allocate_request(req_id, vol_id, item_id)
+
+        # Database session rollback must have preserved exact initial state
+        assert db.session.get(InventoryItem, item_id).quantity == initial_stock
+        assert db.session.get(ReliefRequest, req_id).status == STATUS_REQUEST_PENDING
+        assert Assignment.query.filter_by(request_id=req_id).count() == 0
+
+
+def test_inventory_quantity_never_becomes_negative_on_stock_deduction(app, seed):
+    """AC6: Inventory quantity updates reject negative totals and preserve stock integrity."""
+    with app.app_context():
+        item = db.session.get(InventoryItem, seed["item"])
+        current_stock = item.quantity
+
+        # Attempt to reduce by more than available stock
+        with pytest.raises(ValueError, match="Insufficient stock"):
+            update_inventory_stock(item.item_id, -(current_stock + 10))
+
+        # Attempt non-integer quantity change
+        with pytest.raises(ValueError):
+            update_inventory_stock(item.item_id, "invalid_num")
+
+        # Inventory must remain completely unchanged
+        assert db.session.get(InventoryItem, item.item_id).quantity == current_stock
+
+
+def test_completed_or_cancelled_request_cannot_be_reallocated(app, seed):
+    """AC4 & AC5: Requests that are already fulfilled or cancelled cannot be allocated."""
+    with app.app_context():
+        initial_stock = db.session.get(InventoryItem, seed["item"]).quantity
+        req = db.session.get(ReliefRequest, seed["request"])
+        req.status = STATUS_REQUEST_FULFILLED
+        db.session.commit()
+
+        # Attempt allocation to already fulfilled request
+        with pytest.raises(ValueError, match="Only pending requests can be allocated"):
+            allocate_request(seed["request"], seed["volunteer"], seed["item"])
+
+        # Repeat for cancelled request
+        req.status = STATUS_REQUEST_CANCELLED
+        db.session.commit()
+
+        with pytest.raises(ValueError, match="Only pending requests can be allocated"):
+            allocate_request(seed["request"], seed["volunteer"], seed["item"])
+
+        # Stock must remain untouched
+        assert db.session.get(InventoryItem, seed["item"]).quantity == initial_stock
+
+
+def test_full_allocation_and_delivery_audit_consistency(app, seed):
+    """AC1, AC9 & AC10: Complete lifecycle maintains exact synchronization across items, requests, and audit logs."""
+    with app.app_context():
+        initial_stock = db.session.get(InventoryItem, seed["item"]).quantity
+        assignment = allocate_request(seed["request"], seed["volunteer"], seed["item"], quantity_assigned=4)
+        task_id = assignment.task_id
+
+        # Update assignment through In Progress and Completed
+        update_assignment_status(task_id, STATUS_ASSIGNMENT_IN_PROGRESS)
+        update_assignment_status(task_id, STATUS_ASSIGNMENT_COMPLETED)
+
+        # State verifications
+        assert db.session.get(InventoryItem, seed["item"]).quantity == initial_stock - 4
+        assert db.session.get(ReliefRequest, seed["request"]).status == STATUS_REQUEST_FULFILLED
+        assert db.session.get(Assignment, task_id).status == STATUS_ASSIGNMENT_COMPLETED
+
+        # Audit logs check
+        task_logs = AuditLog.query.filter_by(entity_type="Assignment", entity_id=task_id).all()
+        assert len(task_logs) >= 2  # Allocation + status transitions
