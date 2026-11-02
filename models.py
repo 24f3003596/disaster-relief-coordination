@@ -223,3 +223,20 @@ class PhoneOTP(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
 
     user = db.relationship("User", backref=db.backref("phone_otps", lazy=True))
+
+
+class InventoryShortageState(db.Model):
+    """Tracks whether a category's current shortage episode is active.
+
+    Keeping this state separate from notification read/unread status prevents
+    repeated checks from re-notifying an unchanged shortage. A resolved
+    shortage resets the episode so a later recurrence can generate a new alert.
+    """
+    __tablename__ = "inventory_shortage_states"
+
+    category_key = db.Column(db.String(80), primary_key=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=False)
+    available_stock = db.Column(db.Integer, nullable=False, default=0)
+    configured_threshold = db.Column(db.Integer, nullable=False, default=0)
+    pending_request_count = db.Column(db.Integer, nullable=False, default=0)
+    updated_at = db.Column(db.DateTime, nullable=False, default=utc_now, onupdate=utc_now)

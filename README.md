@@ -339,11 +339,33 @@ Rejected accounts remain blocked. A later role change by an Admin resets the app
 
 The application creates the new OTP table and applies additive columns to the existing `users` table at startup. Back up `disaster_relief.db` before deploying the update.
 
-
 ## Sprint 6 – CI and Backup/Recovery
 
-See [`docs/SPRINT6_CI_BACKUP_DEPLOYMENT.md`](docs/SPRINT6_CI_BACKUP_DEPLOYMENT.md)
+See [docs/SPRINT6_CI_BACKUP_DEPLOYMENT.md](docs/SPRINT6_CI_BACKUP_DEPLOYMENT.md)
 for the GitHub Actions pull-request workflow, environment configuration,
 database backup and separate-environment restore commands, and deployment
 readiness checklist. The repository retains one CI workflow at
-`.github/workflows/ci.yml`.
+.github/workflows/ci.yml.
+
+## Sprint 6: Dashboard Analytics and Critical-Shortage Notifications
+
+Sprint 6 hardens the operational analytics and shortage-alert features:
+- Coordinator/Admin-only dashboard analytics.
+- Admin-only CSV exports for relief requests and inventory.
+- Spreadsheet-formula-safe CSV text values and secure download headers.
+- Automated shortage notifications for matching pending relief requests.
+- Persisted shortage-episode state to prevent duplicate alerts until recovery.
+- Notifications restricted to active, verified and approved Coordinators/Admins.
+- Authenticated, owner-scoped notification retrieval and protected broadcast operations.
+
+See docs/SPRINT6_DASHBOARD_AND_SHORTAGE_IMPLEMENTATION.md for implementation details and test instructions.
+
+## Sprint 6: Inventory and Resource Consistency
+
+Sprint 6 enforces transactional consistency and safety invariants:
+- Atomic stock deductions and rollback on mid-transaction commit failures.
+- Expired inventory item allocation rejection.
+- Unapproved and inactive volunteer dispatch prevention.
+- Mathematical stock consistency across multi-tier allocations.
+
+See docs/SPRINT6_INVENTORY_RESOURCE_CONSISTENCY.md for validation evidence.

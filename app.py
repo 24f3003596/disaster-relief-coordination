@@ -510,12 +510,8 @@ def create_app(test_config=None):
 
         user_id = session.get("user_id")
 
-        if user_id:
-            notifs = list_notifications(user_id)
-        else:
-            notifs = Notification.query.order_by(
-                Notification.created_at.desc()
-            ).all()
+        # Never expose other users' private notifications to anonymous visitors.
+        notifs = list_notifications(user_id) if user_id else []
 
         return render_template(
             "notifications.html",

@@ -500,13 +500,24 @@ def test_replenishment_and_subsequent_shortage_allows_new_notification(app):
         notif = Notification.query.filter_by(user_id=coord_id, type=NOTIFICATION_CRITICAL_SHORTAGE).first()
         assert notif is not None
 
-        # Coordinator marks notification as read
+        # Mark the first alert as read. Reading alone must not create a new
+        # alert while the same shortage episode remains unresolved.
         notif.is_read = True
         db.session.commit()
+        assert check_and_notify_critical_shortage(category="Food & Water") == []
+        assert Notification.query.filter_by(
+            type=NOTIFICATION_CRITICAL_SHORTAGE
+        ).count() == 1
 
-        # Stock drops further or new event occurs: now that it is read, a new alert can be dispatched
-        created = check_and_notify_critical_shortage(category="Food & Water")
-        assert len(created) >= 1
+        # Replenish above the threshold to close the episode, then reduce
+        # stock below threshold to create a genuinely new shortage episode.
+        update_inventory_stock(item.item_id, 10)  # 3 -> 13 (> threshold 5)
+        update_inventory_stock(item.item_id, -9)  # 13 -> 4 (<= threshold 5)
+        alerts = Notification.query.filter_by(
+            user_id=coord_id,
+            type=NOTIFICATION_CRITICAL_SHORTAGE,
+        ).all()
+        assert len(alerts) == 2
 
 
 def test_allocation_automatically_triggers_shortage_notification(app):

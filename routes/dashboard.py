@@ -6,6 +6,7 @@ from sqlalchemy import func
 from extensions import db
 from models import ReliefRequest, InventoryItem, Incident, User, Assignment, AuditLog
 from auth import login_required, roles_required
+from csv_safety import safe_csv_text
 from constants import (
     STATUS_REQUEST_PENDING,
     STATUS_REQUEST_ALLOCATED,
@@ -50,10 +51,10 @@ def generate_relief_requests_csv():
         writer.writerow([
             req.request_id,
             req.user_id,
-            req.category,
+            safe_csv_text(req.category),
             req.quantity,
             req.urgency,
-            req.location,
+            safe_csv_text(req.location),
             req.latitude if req.latitude is not None else "",
             req.longitude if req.longitude is not None else "",
             req.incident_id if req.incident_id is not None else "",
@@ -83,9 +84,9 @@ def generate_inventory_csv():
     for item in items:
         writer.writerow([
             item.item_id,
-            item.category,
+            safe_csv_text(item.category),
             item.quantity,
-            item.storage_location,
+            safe_csv_text(item.storage_location),
             item.expiry_date.isoformat() if item.expiry_date else "",
             item.threshold,
             "Yes" if item.is_low_stock() else "No",
@@ -255,7 +256,10 @@ def get_dashboard_summary():
 
 
 @dashboard_bp.get("/summary")
+@login_required
+@roles_required("Coordinator", ROLE_ADMIN)
 def summary_api():
+    """Return operational analytics only to authorized operational roles."""
     summary = get_dashboard_summary()
     return jsonify(summary), 200
 
@@ -269,6 +273,8 @@ def export_requests_csv_route():
     csv_data = generate_relief_requests_csv()
     response = Response(csv_data, mimetype="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=relief_requests.csv"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
     return response
 
 
@@ -280,24 +286,17 @@ def export_inventory_csv_route():
     csv_data = generate_inventory_csv()
     response = Response(csv_data, mimetype="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=inventory.csv"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
     return response
 
 
 @dashboard_bp.get("/")
+@login_required
+@roles_required("Coordinator", ROLE_ADMIN)
 def dashboard_page():
+    """Render the analytics dashboard for Coordinators and Admins only."""
     summary = get_dashboard_summary()
     if request.headers.get("Accept") == "application/json" or request.args.get("format") == "json":
         return jsonify(summary), 200
-    from flask import current_app, session, redirect, url_for, flash
-    user_id = session.get("user_id")
-    user = db.session.get(User, user_id) if user_id else None
-    if not current_app.config.get("TESTING"):
-        if not user:
-            flash("Please sign in to access the coordinator dashboard.", "warning")
-            return redirect(url_for("root_login"))
-        if user.role not in ["Coordinator", "Admin"]:
-            flash("Access denied: Coordinator permissions required for the analytics dashboard.", "danger")
-            if user.role == "Volunteer":
-                return redirect(url_for("root_assignments"))
-            return redirect("/requests")
     return render_template("dashboard.html", summary=summary)
