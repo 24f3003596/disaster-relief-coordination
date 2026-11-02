@@ -1,10 +1,10 @@
 # Defect Log & Observations Dossier
 
 **Project**: Disaster Relief Resource Coordination System (Team 20)  
-**Sprint**: Sprint 5 (Final Release Review)  
+**Sprint**: Sprint 6 (Review 6 Delivery)  
 **Date**: 2026-11-02  
-**Total Confirmed Defects**: 27  
-**Total Resolved**: 27 (100% Resolution Rate)  
+**Total Confirmed Defects**: 30  
+**Total Resolved**: 30 (100% Resolution Rate)  
 **Open Defects**: 0  
 
 ---
@@ -16,86 +16,59 @@
 | **Sprints 1–2** | 10 | 2 | 4 | 3 | 1 | 10 | 0 | 100% |
 | **Sprint 3** | 8 | 1 | 3 | 3 | 1 | 8 | 0 | 100% |
 | **Sprint 4** | 4 | 0 | 2 | 2 | 0 | 4 | 0 | 100% |
-| **Sprint 5 (UAT)** | 5 | 0 | 1 | 3 | 1 | 5 | 0 | 100% |
-| **Total** | **27** | **3** | **10** | **11** | **3** | **27** | **0** | **100%** |
+| **Sprint 5** | 5 | 0 | 1 | 3 | 1 | 5 | 0 | 100% |
+| **Sprint 6** | 3 | 0 | 2 | 1 | 0 | 3 | 0 | 100% |
+| **Total** | **30** | **3** | **12** | **12** | **3** | **30** | **0** | **100%** |
 
 ---
 
-## 2. Sprint 5 Defect Observations & Resolutions
+## 2. Sprint 6 Defect Observations & Resolutions
 
-### DEF-023: Incomplete Coordinate Pair Acceptance in Relief Request Intake
+### DEF-028: Expired Inventory Items Eligible for Allocation
+- **Severity**: High
+- **Module**: `assignments.py`
+- **SRS Reference**: FR 3.4.1, FR 3.5.1
+- **Description**: Inventory items with an `expiry_date` strictly before the current date could be successfully allocated to relief requests, posing serious safety and regulatory risks during disaster relief.
+- **Reproduction Steps**:
+  1. Create an inventory item with `expiry_date = today - 3 days`.
+  2. Invoke `allocate_request(request_id, volunteer_id, expired_item_id)`.
+  3. The allocation succeeded and decremented expired stock.
+- **Root Cause**: `allocate_request` verified category match and quantity, but lacked date validation against `item.expiry_date`.
+- **Resolution**: Added temporal validation in `allocate_request`: if `item.expiry_date < datetime.now(timezone.utc).date()`, raise `ValueError("Cannot allocate expired inventory items")`.
+- **Retest Evidence**: `test_inventory_resource_consistency.py::test_expired_inventory_cannot_be_allocated` ✅ PASS.
+
+---
+
+### DEF-029: Unapproved or Inactive Volunteers Eligible for Mission Dispatch
+- **Severity**: High
+- **Module**: `assignments.py`
+- **SRS Reference**: FR 3.1.4, FR 3.5.2
+- **Description**: Volunteer accounts pending administrative review (`approval_status == 'pending'`) or deactivated accounts (`is_active == False`) could be dispatched to relief requests.
+- **Reproduction Steps**:
+  1. Register a volunteer account with `approval_status = "pending"`.
+  2. Invoke `allocate_request(request_id, pending_volunteer_id, item_id)`.
+  3. Assignment task was created for the unverified user.
+- **Root Cause**: Validation checked `volunteer.role == ROLE_VOLUNTEER` but did not verify `approval_status == 'approved'` or `is_active`.
+- **Resolution**: Enforced strict status verification: `if volunteer.approval_status != "approved" or not volunteer.is_active: raise ValueError("Volunteer must be active and approved")`.
+- **Retest Evidence**: `test_inventory_resource_consistency.py::test_unapproved_or_inactive_volunteer_rejected_from_allocation` ✅ PASS.
+
+---
+
+### DEF-030: Multi-Table Transaction Failure Atomicity Guarantee
 - **Severity**: Medium
-- **Module**: `requests_module.py` / `models.py`
-- **SRS Reference**: FR 3.3.4
-- **Description**: Submitting a relief request with only latitude provided (or only longitude) caused partial coordinate records that caused geospatial map query errors.
+- **Module**: `assignments.py`
+- **SRS Reference**: FR 3.4.3, FR 3.5.1
+- **Description**: If a network interruption or unexpected database constraint failure occurred during multi-table writes (stock decrement, task creation, dual notifications, audit trail), the database session could retain dirty states.
 - **Reproduction Steps**:
-  1. POST `/requests/` with `latitude=13.08` and `longitude=None`.
-  2. Request was saved with incomplete spatial data.
-- **Root Cause**: Validation checked whether coordinates were numeric only when both were non-null, failing to reject asymmetric coordinate submissions.
-- **Resolution**: Enforced mutual requirement: both latitude and longitude must be valid floats in [-90, 90] and [-180, 180], or both must be null.
-- **Retest Evidence**: `test_requests.py::test_incomplete_coordinate_pair_is_rejected` ✅ PASS.
+  1. Simulate mid-transaction failure during `db.session.commit()`.
+  2. Observe whether dirty entities persist in session.
+- **Root Cause**: While outer try-except existed, explicit test verification of transactional rollback on simulated commit failures was absent.
+- **Resolution**: Enhanced rollback guarantees: wrapped all multi-table mutations in transactional try-except with explicit `db.session.rollback()` and comprehensive regression tests.
+- **Retest Evidence**: `test_inventory_resource_consistency.py::test_allocation_atomic_rollback_on_database_commit_failure` ✅ PASS.
 
 ---
 
-### DEF-024: Leaflet Marker Clustering Fallback on CDN Interruption
-- **Severity**: Medium
-- **Module**: `templates/map.html` / `map_view.py`
-- **SRS Reference**: FR 3.8.2
-- **Description**: If the CDN resource `leaflet.markercluster.js` failed to load or network was disconnected, the disaster map initialization threw `ReferenceError: L.markerClusterGroup is not defined` and stopped rendering all markers.
-- **Reproduction Steps**:
-  1. Block or disable external CDN resources in browser.
-  2. Load `/map/`.
-  3. Map canvas loaded but pins failed to render.
-- **Root Cause**: Map rendering script unconditionally invoked `L.markerClusterGroup()` without detecting script availability.
-- **Resolution**: Added feature detection in `templates/map.html`: if `L.markerClusterGroup` is unavailable, the map automatically falls back to standard `L.layerGroup()` with individual markers and displays a non-intrusive status indicator.
-- **Retest Evidence**: `test_map_view.py::test_map_page_loads_marker_clustering_assets_and_fallback` ✅ PASS.
-
----
-
-### DEF-025: Activity History Missing Actor Name on Incident Status Transitions
-- **Severity**: Low
-- **Module**: `incidents.py` / `audit.py`
-- **SRS Reference**: FR 3.8.3
-- **Description**: When coordinators transitioned incident statuses, the audit log recorded the action string but omitted the coordinator's name from chronological activity responses.
-- **Reproduction Steps**:
-  1. Transition incident status via PATCH `/incidents/<id>/status`.
-  2. Query `/incidents/<id>/history?format=json`.
-  3. `actor_name` was null in returned records.
-- **Root Cause**: `update_incident_status` passed `actor_id` but did not join `User.name` in audit serialization.
-- **Resolution**: Updated `list_entity_activity()` in `audit.py` to join `User` table and populate `actor_name`, falling back to `"System"` for automated actions.
-- **Retest Evidence**: `test_activity_history.py::test_incident_activity_history_records_creation_and_status_transitions` ✅ PASS.
-
----
-
-### DEF-026: Database Backup Overwrite Prevention
-- **Severity**: Medium
-- **Module**: `database_backup.py`
-- **SRS Reference**: Non-Functional / Data Integrity
-- **Description**: Invoking database backup with a destination path that already existed would overwrite existing backup files without warning, risking inadvertent data loss.
-- **Reproduction Steps**:
-  1. Run `create_backup(source, dest)` where `dest` already exists.
-  2. Destination file was overwritten silently.
-- **Root Cause**: Backup implementation did not verify destination existence before starting SQLite copy.
-- **Resolution**: Added `if dest_path.exists(): raise FileExistsError("Destination file already exists")` before initiating backup and restore operations.
-- **Retest Evidence**: `test_database_backup.py::test_backup_does_not_overwrite_existing_destination` ✅ PASS.
-
----
-
-### DEF-027: Password Length Boundary Handling in Test Fixtures
-- **Severity**: Low
-- **Module**: `tests/test_sprint5_uat.py` / `auth.py`
-- **SRS Reference**: FR 3.1.1
-- **Description**: Initial UAT scenario fixtures used 7-character passwords (`Pass123`), violating the system's 8-character minimum security constraint.
-- **Reproduction Steps**:
-  1. Call `register_user(..., password="Pass123")`.
-  2. Registration rejected with `ValueError: password must contain at least 8 characters`.
-- **Root Cause**: Test fixture convenience values were below production security policy threshold.
-- **Resolution**: Standardized test fixture credentials across all UAT scenarios to meet policy (`Pass12345` / `SecurePassword123`).
-- **Retest Evidence**: `tests/test_sprint5_uat.py` (all 10 scenarios) ✅ PASS.
-
----
-
-## 3. Cumulative Sprint 1 to 4 Defect Register
+## 3. Cumulative Sprint 1 to 5 Defect Register
 
 | ID | Title | Module | Severity | Resolution Summary |
 |---|---|---|---|---|
@@ -121,6 +94,14 @@
 | DEF-020 | CSV export accessible by non-Admin coordinators | `reports.py` | Medium | Restricted export endpoints strictly to `ROLE_ADMIN`. |
 | DEF-021 | Critical shortage notifications duplicated on updates | `notifications.py`| High | Added unread alert existence check for deduplication. |
 | DEF-022 | Shortage notification triggered with 0 pending requests| `notifications.py`| Medium | Added pending request count check before alert creation. |
+| DEF-023 | Asymmetric coordinate pair accepted | `requests_module.py` | Medium | Enforced mutual latitude/longitude presence. |
+| DEF-024 | Marker clustering crash on CDN failure | `templates/map.html` | Medium | Added dynamic CDN detection and layer group fallback. |
+| DEF-025 | Missing actor name in incident activity | `incidents.py` / `audit.py` | Low | Joined `User.name` in audit response. |
+| DEF-026 | Backup destination overwritten silently | `database_backup.py` | Medium | Added `FileExistsError` target protection. |
+| DEF-027 | Password policy length edge case in fixtures | `test_sprint5_uat.py` | Low | Standardized fixtures to 8+ characters. |
+| DEF-028 | Expired inventory items allocated to relief requests | `assignments.py` | High | Added `item.expiry_date` validation check. |
+| DEF-029 | Unapproved/inactive volunteers assigned to relief tasks | `assignments.py` | High | Enforced `approval_status == 'approved'` and `is_active`. |
+| DEF-030 | Multi-table transaction failure atomicity guarantee | `assignments.py` | Medium | Added atomic rollback handling and regression tests. |
 
 ---
 
@@ -131,10 +112,11 @@ Defects per Sprint:
 Sprint 1-2: [##########] 10
 Sprint 3:   [########]    8
 Sprint 4:   [####]        4
-Sprint 5:   [#####]       5 (all UAT edge cases resolved)
+Sprint 5:   [#####]       5
+Sprint 6:   [###]         3
 
-Open Defects: 0
+Total Logged: 30 | Total Resolved: 30 | Open: 0
 Defect Resolution Rate: 100.0%
 ```
 
-All confirmed defects across all sprints have been remediated with regression test coverage. No known defects or security vulnerabilities remain in the codebase.
+All 30 confirmed defects across all 6 sprints have been resolved with regression test coverage. No open defects remain.

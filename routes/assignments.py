@@ -52,10 +52,16 @@ def allocate_request(request_id, volunteer_id, item_id, quantity_assigned=None):
         volunteer = db.session.get(User, volunteer_id)
         if volunteer is None or volunteer.role != ROLE_VOLUNTEER:
             raise ValueError("A valid Volunteer user is required")
+        if volunteer.approval_status != "approved" or not volunteer.is_active:
+            raise ValueError("Volunteer must be active and approved")
 
         item = db.session.get(InventoryItem, item_id)
         if item is None:
             raise ValueError("Inventory item not found")
+        if item.expiry_date:
+            exp_date = item.expiry_date.date() if isinstance(item.expiry_date, datetime) else item.expiry_date
+            if exp_date < datetime.now(timezone.utc).date():
+                raise ValueError("Cannot allocate expired inventory items")
 
         if req.status != STATUS_REQUEST_PENDING:
             raise ValueError("Only pending requests can be allocated")
