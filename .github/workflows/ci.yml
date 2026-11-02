@@ -5,20 +5,32 @@ on:
   pull_request:
     branches:
       - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
 
   push:
     branches:
       - main
+      - "feature/**"
+      - "sprint/**"
 
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    name: Run Pytest Suite
+    name: Validate and run pytest (Python 3.13)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -28,23 +40,32 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-          cache: "pip"
+          cache: pip
           cache-dependency-path: requirements.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
+
+      - name: Validate Python syntax
+        run: python -m compileall -q .
 
       - name: Run automated tests
+        env:
+          APP_ENV: testing
+          SECRET_KEY: ci-test-only-secret-not-for-production
+          OTP_DEMO_MODE: "0"
+          OTP_TTL_MINUTES: "5"
+          DATABASE_URL: sqlite://
         run: |
-          python -m pytest -v --junitxml=test-results.xml
+          python -m pytest -v --tb=short --junitxml=test-results.xml
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-results
+          name: pytest-results-${{ github.run_number }}
           path: test-results.xml
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 14
