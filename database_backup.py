@@ -189,3 +189,36 @@ def restore_backup(backup_path, destination_path):
         )
 
     return destination_path
+
+
+def main():
+    """Command-line interface for safe SQLite backup and restore."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Create or restore a verified SQLite database copy."
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    backup_parser = subparsers.add_parser("backup", help="Create a database backup.")
+    backup_parser.add_argument("--source", required=True, help="Source SQLite database.")
+    backup_parser.add_argument("--output", required=True, help="New backup file path.")
+
+    restore_parser = subparsers.add_parser("restore", help="Restore into a new database file.")
+    restore_parser.add_argument("--backup", required=True, help="Verified backup file.")
+    restore_parser.add_argument("--output", required=True, help="New restore destination.")
+
+    args = parser.parse_args()
+
+    if args.command == "backup":
+        result = create_backup(args.source, args.output)
+        print(f"BACKUP_CREATED={result}")
+        print(f"BACKUP_INTEGRITY={'OK' if check_database_integrity(result) else 'FAILED'}")
+    else:
+        result = restore_backup(args.backup, args.output)
+        print(f"RESTORE_CREATED={result}")
+        print(f"RESTORE_INTEGRITY={'OK' if check_database_integrity(result) else 'FAILED'}")
+
+
+if __name__ == "__main__":
+    main()

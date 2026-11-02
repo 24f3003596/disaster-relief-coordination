@@ -338,3 +338,12 @@ Rejected accounts remain blocked. A later role change by an Admin resets the app
 ### Database update
 
 The application creates the new OTP table and applies additive columns to the existing `users` table at startup. Back up `disaster_relief.db` before deploying the update.
+
+
+## Sprint 6 – CI and Backup/Recovery
+
+See [`docs/SPRINT6_CI_BACKUP_DEPLOYMENT.md`](docs/SPRINT6_CI_BACKUP_DEPLOYMENT.md)
+for the GitHub Actions pull-request workflow, environment configuration,
+database backup and separate-environment restore commands, and deployment
+readiness checklist. The repository retains one CI workflow at
+`.github/workflows/ci.yml`.
